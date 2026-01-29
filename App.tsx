@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Wallet, 
   PlusCircle, 
@@ -10,7 +10,9 @@ import {
   RefreshCw,
   Calendar,
   User as UserIcon,
-  ChevronDown
+  ChevronDown,
+  Loader2,
+  Database
 } from 'lucide-react';
 import { Transaction, TransactionType, User } from './types';
 import TransactionForm from './components/TransactionForm';
@@ -20,10 +22,12 @@ import TransactionTable from './components/TransactionTable';
 import SyncModal from './components/SyncModal';
 import AuthScreen from './components/AuthScreen';
 import AIService from './services/geminiService';
+import { supabase } from './lib/supabase';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showSync, setShowSync] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -35,86 +39,140 @@ const App: React.FC = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  // Load user from session on mount
+  // চেক সেশন
   useEffect(() => {
-    const savedUser = localStorage.getItem('shop_ai_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || ''
+        });
+      }
+      setLoading(false);
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata.name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || ''
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Load transactions based on logged in user
-  useEffect(() => {
-    if (user) {
-      const allData = localStorage.getItem('shop_ai_cloud_data');
-      if (allData) {
-        const parsed = JSON.parse(allData);
-        // Filter transactions strictly for this user's ID
-        const userTxs = parsed.filter((t: Transaction) => t.userId === user.id);
-        setTransactions(userTxs);
-      }
+  // ডাটাবেস থেকে ট্রানজ্যাকশন নিয়ে আসা
+  const fetchTransactions = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('userId', user.id)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching transactions:', error);
     } else {
-      setTransactions([]);
+      setTransactions(data || []);
     }
+    setLoading(false);
   }, [user]);
 
-  const saveToCloud = (newTransactions: Transaction[]) => {
-    if (!user) return;
-    
-    // Simulate cloud storage in LocalStorage
-    const allData = JSON.parse(localStorage.getItem('shop_ai_cloud_data') || '[]');
-    // Keep data of other users, replace only current user's data
-    const otherUsersData = allData.filter((t: Transaction) => t.userId !== user.id);
-    const updatedData = [...otherUsersData, ...newTransactions];
-    
-    localStorage.setItem('shop_ai_cloud_data', JSON.stringify(updatedData));
-    setTransactions(newTransactions);
-  };
+  useEffect(() => {
+    if (user) {
+      fetchTransactions();
+    }
+  }, [user, fetchTransactions]);
 
   const handleLogin = (newUser: User) => {
-    localStorage.setItem('shop_ai_user', JSON.stringify(newUser));
     setUser(newUser);
-    // Refresh date to current month on login
-    const now = new Date();
-    setViewDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   };
 
-  const handleLogout = () => {
-    // Clear all states and local storage for current session
-    localStorage.removeItem('shop_ai_user');
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     setTransactions([]);
     setAiInsight(null);
     setShowProfileMenu(false);
-    setShowForm(false);
-    setShowSync(false);
   };
 
-  const addTransaction = (newTx: Transaction) => {
+  const addTransaction = async (newTx: Transaction) => {
     if (!user) return;
-    const txWithUser = { ...newTx, userId: user.id };
-    saveToCloud([txWithUser, ...transactions]);
-    setShowForm(false);
-  };
+    
+    // ডাটাবেসে সেভ করা এবং রেসপন্স থেকে সঠিক ডাটা (আইডিসহ) নেওয়া
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert([newTx])
+      .select();
 
-  const deleteTransaction = (id: string) => {
-    if (window.confirm('এই হিসাবটি মুছে ফেলতে চান?')) {
-      const updated = transactions.filter(t => t.id !== id);
-      saveToCloud(updated);
+    if (error) {
+      alert(`ডাটা সেভ হয়নি: ${error.message}`);
+      console.error('Insert error:', error);
+    } else if (data && data.length > 0) {
+      // স্টেট আপডেট যাতে নতুন আইটেমটি সবার উপরে থাকে
+      setTransactions(prev => [data[0], ...prev]);
+      setShowForm(false);
     }
   };
 
-  const handleImportData = (newData: Transaction[]) => {
-    if (user) {
-      const txsWithId = newData.map(t => ({ ...t, userId: user.id }));
-      saveToCloud(txsWithId);
-      setShowSync(false);
+  const handleImportData = async (importedData: Transaction[]) => {
+    if (!user) return;
+    
+    setLoading(true);
+    const dataToInsert = importedData.map(item => ({
+      ...item,
+      id: crypto.randomUUID(), 
+      userId: user.id
+    }));
+
+    const { error } = await supabase
+      .from('transactions')
+      .insert(dataToInsert);
+
+    if (error) {
+      alert(`ইমপোর্ট ব্যর্থ: ${error.message}`);
+    } else {
+      alert('সব ডাটা সফলভাবে ইমপোর্ট হয়েছে!');
+      fetchTransactions();
+    }
+    setLoading(false);
+    setShowSync(false);
+  };
+
+  const deleteTransaction = async (id: string) => {
+    if (!id) return;
+    
+    if (window.confirm('আপনি কি নিশ্চিত যে এই হিসাবটি মুছে ফেলবেন?')) {
+      // ডাটাবেস থেকে ডিলিট করার রিকোয়েস্ট
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+        .eq('userId', user?.id); // সুরক্ষার জন্য ইউজার আইডি চেক
+
+      if (error) {
+        alert(`মুছে ফেলা যায়নি: ${error.message}\nটিপস: আপনার SQL Editor-এ DELETE পলিসি রান করা আছে কি না চেক করুন।`);
+        console.error('Delete error:', error);
+      } else {
+        // ডাটাবেস থেকে ডিলিট সফল হলে স্টেট থেকে রিমুভ করা
+        setTransactions(prev => prev.filter(t => t.id !== id));
+      }
     }
   };
 
   const handleGetAiInsight = async () => {
     if (filteredTransactions.length === 0) {
-      setAiInsight("এই মাসে কোনো ডাটা নেই।");
+      setAiInsight("বিশ্লেষণের জন্য এই মাসে কোনো ডাটা নেই।");
       return;
     }
     setIsAiLoading(true);
@@ -153,6 +211,14 @@ const App: React.FC = () => {
     return date.toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-10 h-10 text-slate-900 animate-spin" />
+      </div>
+    );
+  }
+
   if (!user) {
     return <AuthScreen onLogin={handleLogin} />;
   }
@@ -166,18 +232,27 @@ const App: React.FC = () => {
               <Wallet size={18} />
             </div>
             <div>
-              <h1 className="text-xs font-black text-slate-900 uppercase tracking-tighter">SHOP AI SYNC</h1>
+              <h1 className="text-xs font-black text-slate-900 uppercase tracking-tighter">RASAL SHOP AI</h1>
               <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1">
                 <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
-                Connected
+                Supabase Online
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowSync(true)}
+              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+              title="Data Sync & Backup"
+            >
+              <Database size={18} />
+            </button>
+            
+            <button 
+              onClick={fetchTransactions}
               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+              title="Refresh Data"
             >
               <RefreshCw size={18} />
             </button>
@@ -291,9 +366,17 @@ const App: React.FC = () => {
         <PlusCircle size={24} />
       </button>
 
+      {showSync && (
+        <SyncModal 
+          transactions={transactions} 
+          onImport={handleImportData} 
+          onClose={() => setShowSync(false)} 
+        />
+      )}
+
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] shadow-2xl p-10 animate-in slide-in-from-bottom duration-300">
+          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] shadow-2xl p-10 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">নতুন হিসাব যোগ করুন</h2>
               <button onClick={() => setShowForm(false)} className="p-2 text-slate-400 hover:text-slate-900">
@@ -303,14 +386,6 @@ const App: React.FC = () => {
             <TransactionForm onAdd={addTransaction} userId={user.id} />
           </div>
         </div>
-      )}
-
-      {showSync && (
-        <SyncModal 
-          transactions={transactions} 
-          onImport={handleImportData} 
-          onClose={() => setShowSync(false)} 
-        />
       )}
     </div>
   );

@@ -1,0 +1,7 @@
+{
+  "name": "Shop AI Sync",
+  "description": "An intelligent business manager for tracking income, expenses, and profit with AI-powered insights, specifically designed for small shop owners.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

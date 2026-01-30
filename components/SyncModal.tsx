@@ -11,28 +11,91 @@ interface SyncModalProps {
 
 const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }) => {
   
-  const handleExportCode = () => {
-    const code = btoa(JSON.stringify(transactions));
-    navigator.clipboard.writeText(code);
-    alert('কোডটি ক্লিপবোর্ডে কপি করা হয়েছে। অন্য ডিভাইসে এটি পেস্ট করুন।');
+  // Unicode safe Base64 encoding (বাংলা অক্ষরের জন্য প্রয়োজন)
+  const toBase64 = (str: string) => {
+    try {
+      return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode(parseInt(p1, 16));
+      }));
+    } catch (e) {
+      console.error('Encoding error:', e);
+      return null;
+    }
   };
 
-  const handleImportCode = async () => {
-    const code = prompt('আপনার সিঙ্ক কোডটি এখানে পেস্ট করুন:');
-    if (!code) return;
+  // Unicode safe Base64 decoding
+  const fromBase64 = (str: string) => {
     try {
-      const decoded = JSON.parse(atob(code));
-      if (Array.isArray(decoded)) {
-        onImport(decoded);
+      return decodeURIComponent(atob(str).split('').map((c) => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+    } catch (e) {
+      console.error('Decoding error:', e);
+      return null;
+    }
+  };
+
+  const handleExportCode = async () => {
+    if (transactions.length === 0) {
+      alert('কপি করার জন্য কোনো ডাটা নেই।');
+      return;
+    }
+
+    const jsonStr = JSON.stringify(transactions);
+    const code = toBase64(jsonStr);
+
+    if (!code) {
+      alert('কোড তৈরি করতে সমস্যা হয়েছে।');
+      return;
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(code);
+        alert('কোডটি ক্লিপবোর্ডে কপি করা হয়েছে। অন্য ডিভাইসে এটি পেস্ট করুন।');
       } else {
-        throw new Error('Invalid data');
+        // Fallback for browsers that don't support navigator.clipboard
+        const textArea = document.createElement("textarea");
+        textArea.value = code;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+        alert('কোডটি কপি করা হয়েছে।');
+      }
+    } catch (err) {
+      alert('কপি করা সম্ভব হয়নি। ম্যানুয়ালি ফাইল ব্যাকআপ ব্যবহার করুন।');
+    }
+  };
+
+  const handleImportCode = () => {
+    const code = prompt('আপনার সিঙ্ক কোডটি এখানে পেস্ট করুন:');
+    if (!code || code.trim() === "") return;
+    
+    try {
+      const decodedStr = fromBase64(code.trim());
+      if (!decodedStr) throw new Error('Invalid base64');
+      
+      const decoded = JSON.parse(decodedStr);
+      if (Array.isArray(decoded)) {
+        if (window.confirm(`${decoded.length}টি হিসাব পাওয়া গেছে। আপনি কি এগুলো ইমপোর্ট করতে চান?`)) {
+          onImport(decoded);
+          alert('সফলভাবে ইমপোর্ট হয়েছে!');
+        }
+      } else {
+        throw new Error('Invalid data format');
       }
     } catch (e) {
       alert('ভুল কোড দেওয়া হয়েছে। দয়া করে সঠিক কোডটি কপি করে আনুন।');
+      console.error('Import error:', e);
     }
   };
 
   const handleDownloadFile = () => {
+    if (transactions.length === 0) {
+      alert('ডাউনলোড করার জন্য কোনো ডাটা নেই।');
+      return;
+    }
     const dataStr = JSON.stringify(transactions, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -54,6 +117,7 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
         const decoded = JSON.parse(result);
         if (Array.isArray(decoded)) {
           onImport(decoded);
+          alert('ফাইল থেকে ডাটা সফলভাবে নেওয়া হয়েছে!');
         } else {
           throw new Error('Invalid format');
         }
@@ -62,6 +126,8 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
       }
     };
     reader.readAsText(file);
+    // Reset input value to allow uploading same file again
+    e.target.value = '';
   };
 
   return (
@@ -77,7 +143,7 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
 
         {/* Content */}
         <div className="text-center space-y-2 mb-8">
-          <h2 className="text-3xl font-bold text-slate-800">ডাটা সিংকিং</h2>
+          <h2 className="text-3xl font-bold text-slate-800 tracking-tighter">ডাটা সিঙ্কিং</h2>
           <p className="text-slate-500 text-sm px-4">
             অন্য ডিভাইসে আপনার সব হিসাব ট্রান্সফার করার জন্য নিচের অপশনগুলো ব্যবহার করুন।
           </p>

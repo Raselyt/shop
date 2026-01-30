@@ -70,7 +70,6 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ডাটাবেস থেকে ট্রানজ্যাকশন নিয়ে আসা
   const fetchTransactions = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -122,30 +121,40 @@ const App: React.FC = () => {
     }
   };
 
-  const handleImportTransactions = async (importedData: Transaction[]) => {
-    if (!user || importedData.length === 0) return;
+  const handleImportTransactions = async (importedData: any[]) => {
+    if (!user || !Array.isArray(importedData) || importedData.length === 0) {
+      alert('ইমপোর্ট করার জন্য সঠিক ডাটা পাওয়া যায়নি।');
+      return;
+    }
 
     setLoading(true);
     
-    // ডাটাগুলোকে বর্তমান ইউজার আইডি দিয়ে ম্যাপ করা হচ্ছে যাতে সেগুলো এই একাউন্টে দেখা যায়
+    // ডাটা ক্লিজিং এবং বর্তমান ইউজার আইডির সাথে ম্যাপিং
     const transactionsToInsert = importedData.map(tx => ({
-      ...tx,
-      id: crypto.randomUUID(), // নতুন আইডি জেনারেট করা হচ্ছে যাতে ডুপ্লিকেট না হয়
+      id: crypto.randomUUID(),
+      description: tx.description || 'বিবরণ নেই',
+      amount: Number(tx.amount) || 0,
+      type: tx.type === 'Income' ? TransactionType.INCOME : TransactionType.EXPENSE,
+      category: tx.category || 'অন্যান্য',
+      date: tx.date || new Date().toISOString().split('T')[0],
       userId: user.id
     }));
 
-    const { error } = await supabase
-      .from('transactions')
-      .insert(transactionsToInsert);
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .insert(transactionsToInsert);
 
-    if (error) {
-      alert(`ডাটা ইমপোর্ট করা সম্ভব হয়নি: ${error.message}`);
-    } else {
-      await fetchTransactions(); // ডাটাবেস থেকে সব ডাটা আবার লোড করা হচ্ছে
-      alert('সফলভাবে সব ডাটা আপনার বর্তমান একাউন্টে যোগ করা হয়েছে!');
+      if (error) throw error;
+
+      await fetchTransactions();
+      alert(`সফলভাবে ${transactionsToInsert.length}টি ডাটা ইমপোর্ট করা হয়েছে!`);
+    } catch (err: any) {
+      alert(`ইমপোর্ট ব্যর্থ হয়েছে: ${err.message}`);
+    } finally {
+      setLoading(false);
+      setShowSync(false);
     }
-    setLoading(false);
-    setShowSync(false);
   };
 
   const deleteTransaction = async (id: string) => {
@@ -159,7 +168,7 @@ const App: React.FC = () => {
         .eq('userId', user?.id);
 
       if (error) {
-        alert(`মুছে ফেলা যায়নি। নিশ্চিত করুন যে সুপাবেজে ডিলিট পলিসি সেট করা আছে।`);
+        alert(`মুছে ফেলা যায়নি।`);
       } else {
         setTransactions(prev => prev.filter(t => t.id !== id));
       }
@@ -210,7 +219,10 @@ const App: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-10 h-10 text-slate-900 animate-spin" />
+        <div className="text-center space-y-4">
+          <Loader2 className="w-10 h-10 text-slate-900 animate-spin mx-auto" />
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">লোডিং হচ্ছে...</p>
+        </div>
       </div>
     );
   }
@@ -240,12 +252,14 @@ const App: React.FC = () => {
             <button 
               onClick={() => setShowSync(true)}
               className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+              title="Sync Data"
             >
               <Database size={18} />
             </button>
             <button 
               onClick={fetchTransactions}
               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+              title="Refresh"
             >
               <RefreshCw size={18} />
             </button>

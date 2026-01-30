@@ -122,6 +122,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleImportTransactions = async (importedData: Transaction[]) => {
+    if (!user || importedData.length === 0) return;
+
+    setLoading(true);
+    
+    // ডাটাগুলোকে বর্তমান ইউজার আইডি দিয়ে ম্যাপ করা হচ্ছে যাতে সেগুলো এই একাউন্টে দেখা যায়
+    const transactionsToInsert = importedData.map(tx => ({
+      ...tx,
+      id: crypto.randomUUID(), // নতুন আইডি জেনারেট করা হচ্ছে যাতে ডুপ্লিকেট না হয়
+      userId: user.id
+    }));
+
+    const { error } = await supabase
+      .from('transactions')
+      .insert(transactionsToInsert);
+
+    if (error) {
+      alert(`ডাটা ইমপোর্ট করা সম্ভব হয়নি: ${error.message}`);
+    } else {
+      await fetchTransactions(); // ডাটাবেস থেকে সব ডাটা আবার লোড করা হচ্ছে
+      alert('সফলভাবে সব ডাটা আপনার বর্তমান একাউন্টে যোগ করা হয়েছে!');
+    }
+    setLoading(false);
+    setShowSync(false);
+  };
+
   const deleteTransaction = async (id: string) => {
     if (!id) return;
     
@@ -301,7 +327,7 @@ const App: React.FC = () => {
         <PlusCircle size={24} />
       </button>
 
-      {showSync && <SyncModal transactions={transactions} onImport={fetchTransactions} onClose={() => setShowSync(false)} />}
+      {showSync && <SyncModal transactions={transactions} onImport={handleImportTransactions} onClose={() => setShowSync(false)} />}
       {showForm && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center">
           <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]">

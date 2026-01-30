@@ -3,25 +3,28 @@ import { GoogleGenAI } from "@google/genai";
 import { Transaction } from "../types";
 
 class GeminiService {
-  // Guidelines: Create a new instance right before making an API call to ensure up-to-date API key.
-  // Guidelines: Use process.env.API_KEY directly.
   async analyzeBusiness(transactions: Transaction[]): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Prepare data summary for AI
-    const summary = transactions.slice(0, 50).map(t => 
+    // Prepare data summary for AI focusing on shop needs
+    const summary = transactions.slice(0, 40).map(t => 
       `${t.date}: ${t.description} - ${t.type} - €${t.amount}`
     ).join('\n');
 
     const prompt = `
-      You are a business consultant for a small shop owner. 
-      Analyze the following recent transactions and provide 2-3 short, actionable bullet points in Bengali for the shop owner to improve profit or manage expenses.
-      Be encouraging and concise.
+      You are a smart business consultant for "RASAL SHOP", a daily small shop. 
+      Analyze the following recent sales and expense data (all amounts in Euro €). 
+      Provide 2-3 very short, actionable, and encouraging bullet points in Bengali for the shop owner to:
+      1. Increase daily sales (বিক্রি বৃদ্ধি).
+      2. Manage daily expenses better (খরচ নিয়ন্ত্রণ).
+      3. Maximize monthly profit (লাভ বাড়ানো).
 
+      Keep it friendly and concise for a mobile screen. Use € symbol.
+      
       Transactions Data:
       ${summary}
 
-      Response should be entirely in Bengali. Max 3 sentences.
+      Response must be entirely in Bengali. Max 3 short sentences.
     `;
 
     try {
@@ -30,11 +33,10 @@ class GeminiService {
         contents: prompt,
       });
 
-      // Guidelines: Use the .text property directly.
-      return response.text || "দুঃখিত, কোনো ইনসাইট তৈরি করা সম্ভব হয়নি।";
+      return response.text || "দুঃখিত, এই মুহূর্তে বিশ্লেষণ করা সম্ভব হচ্ছে না।";
     } catch (error) {
       console.error("Gemini Analysis Error:", error);
-      return "AI এই মুহূর্তে কাজ করছে না। দয়া করে পরে চেষ্টা করুন।";
+      return "AI ইঞ্জিন লোড হতে সমস্যা হচ্ছে। দয়া করে ইন্টারনেট কানেকশন চেক করুন।";
     }
   }
 }

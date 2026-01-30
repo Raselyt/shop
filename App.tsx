@@ -9,10 +9,12 @@ import {
   Sparkles,
   RefreshCw,
   Calendar,
-  User as UserIcon,
   ChevronDown,
   Loader2,
-  Database
+  Database,
+  ArrowUpRight,
+  ArrowDownRight,
+  LayoutDashboard
 } from 'lucide-react';
 import { Transaction, TransactionType, User } from './types.ts';
 import TransactionForm from './components/TransactionForm.tsx';
@@ -206,6 +208,15 @@ const App: React.FC = () => {
     };
   }, [filteredTransactions]);
 
+  // Today's specific stats
+  const todayStats = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayTxs = transactions.filter(t => t.date === today);
+    const income = todayTxs.filter(t => t.type === TransactionType.INCOME).reduce((s, t) => s + t.amount, 0);
+    const expense = todayTxs.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+    return { income, expense, profit: income - expense };
+  }, [transactions]);
+
   const getDisplayMonth = () => {
     const [y, m] = viewDate.split('-');
     const date = new Date(parseInt(y), parseInt(m) - 1);
@@ -228,18 +239,18 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-20 md:pb-10 bg-slate-50 overflow-x-hidden">
-      <header className="bg-white shadow-sm sticky top-0 z-30 px-4 py-3 border-b border-slate-100">
+    <div className="min-h-screen pb-20 md:pb-10 bg-slate-50 overflow-x-hidden selection:bg-blue-100">
+      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30 px-4 py-3 border-b border-slate-100">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-slate-900 p-2 rounded-xl text-white">
+            <div className="bg-slate-900 p-2 rounded-xl text-white shadow-lg shadow-slate-200">
               <Wallet size={18} />
             </div>
             <div>
-              <h1 className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">RASAL SHOP AI</h1>
-              <p className="text-[8px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1">
-                <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
-                Supabase Online
+              <h1 className="text-[11px] font-black text-slate-900 uppercase tracking-tighter leading-none">RASAL SHOP AI</h1>
+              <p className="text-[8px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1 mt-0.5">
+                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                Connected
               </p>
             </div>
           </div>
@@ -247,20 +258,22 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowSync(true)}
-              className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl transition-all"
+              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all active:scale-90"
+              title="Sync Data"
             >
               <Database size={18} />
             </button>
             <button 
               onClick={fetchTransactions}
-              className="p-2 text-slate-400 hover:text-blue-600 rounded-xl transition-all"
+              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all active:scale-90"
+              title="Refresh"
             >
               <RefreshCw size={18} />
             </button>
             <div className="relative">
               <button 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 pl-1 pr-2 py-1 bg-slate-100 rounded-full border border-slate-200"
+                className="flex items-center gap-2 pl-1 pr-2 py-1 bg-slate-100 rounded-full border border-slate-200 hover:bg-slate-200 transition-colors"
               >
                 <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
                   {user.name[0].toUpperCase()}
@@ -268,7 +281,11 @@ const App: React.FC = () => {
                 <ChevronDown size={12} className="text-slate-400" />
               </button>
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2 animate-in fade-in zoom-in duration-200">
+                  <div className="px-3 py-2 border-b border-slate-50 mb-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">ইউজার প্রোফাইল</p>
+                    <p className="text-xs font-bold text-slate-800 truncate">{user.name}</p>
+                  </div>
                   <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors text-xs font-bold">
                     <LogOut size={16} /> লগআউট করুন
                   </button>
@@ -280,68 +297,124 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
+        {/* Today's Summary Banner */}
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex items-center justify-between group">
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-50 p-2.5 rounded-2xl text-slate-500">
+              <LayoutDashboard size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">আজকের সারাংশ</p>
+              <h2 className="text-sm font-black text-slate-800">মোট লাভ: <span className={todayStats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}>€{todayStats.profit.toLocaleString('en-EU')}</span></h2>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="text-right">
+              <p className="text-[8px] font-bold text-emerald-500 uppercase">বিক্রি</p>
+              <p className="text-xs font-black text-slate-700">€{todayStats.income.toLocaleString('en-EU')}</p>
+            </div>
+            <div className="w-px h-8 bg-slate-100 mx-1 self-center"></div>
+            <div className="text-right">
+              <p className="text-[8px] font-bold text-rose-500 uppercase">খরচ</p>
+              <p className="text-xs font-black text-slate-700">€{todayStats.expense.toLocaleString('en-EU')}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Calendar size={18} className="text-slate-400" />
-            <h2 className="text-sm font-bold text-slate-800">{getDisplayMonth()}</h2>
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter">{getDisplayMonth()}</h2>
           </div>
           <input 
             type="month" 
             value={viewDate}
             onChange={(e) => setViewDate(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-200 transition-all"
           />
         </div>
 
-        <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="bg-slate-900 rounded-[2rem] p-6 text-white shadow-xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-blue-500/30 transition-all"></div>
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-blue-300" />
-              <h3 className="text-sm font-bold">AI বিজনেস ইনসাইট</h3>
+              <div className="p-1.5 bg-blue-500/20 rounded-lg backdrop-blur-sm">
+                <Sparkles size={16} className="text-blue-300" />
+              </div>
+              <h3 className="text-sm font-bold tracking-tight">AI বিজনেস ইন্টেলিজেন্স</h3>
             </div>
-            <p className="text-xs leading-relaxed text-slate-200">
-              {aiInsight || "এই মাসের হিসাব বিশ্লেষণ করতে নিচের বাটনটি চাপুন।"}
-            </p>
+            <div className="min-h-[3rem]">
+              <p className="text-xs leading-relaxed text-slate-200 font-medium">
+                {aiInsight || "আপনার লেনদেনের ডাটা বিশ্লেষণ করে ব্যক্তিগত ব্যবসায়িক পরামর্শ পেতে নিচের বাটনে ক্লিক করুন।"}
+              </p>
+            </div>
             <button 
               onClick={handleGetAiInsight}
               disabled={isAiLoading}
-              className="bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-full hover:bg-blue-50 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+              className="bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest px-8 py-3.5 rounded-2xl hover:bg-blue-50 transition-all shadow-lg active:scale-95 disabled:opacity-50 flex items-center gap-2"
             >
-              {isAiLoading ? 'অপেক্ষা করুন...' : 'বিশ্লেষণ করুন'}
+              {isAiLoading ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" /> অপেক্ষা করুন...
+                </>
+              ) : 'বিশ্লেষণ করুন'}
             </button>
           </div>
         </div>
 
         <DashboardCards stats={stats} />
 
-        <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-            <TrendingUp size={14} className="text-emerald-500" /> প্রবৃদ্ধি গ্রাফ
-          </h2>
+        <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <TrendingUp size={14} className="text-emerald-500" /> আয়-ব্যয় গ্রাফ
+            </h2>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span className="text-[9px] font-bold text-slate-500 uppercase">আয়</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                <span className="text-[9px] font-bold text-slate-500 uppercase">ব্যয়</span>
+              </div>
+            </div>
+          </div>
           <div className="h-64 w-full">
             <TrendsChart transactions={filteredTransactions} />
           </div>
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            <History size={14} className="text-slate-500" /> লেনদেনসমূহ
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <History size={14} className="text-slate-500" /> সাম্প্রতিক লেনদেনসমূহ
+            </h2>
+            <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded-lg uppercase tracking-wider">{filteredTransactions.length}টি এন্ট্রি</span>
+          </div>
           <TransactionTable transactions={filteredTransactions} onDelete={deleteTransaction} />
         </section>
       </main>
 
-      <button onClick={() => setShowForm(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center z-40 border-4 border-white active:scale-90 transition-transform">
-        <PlusCircle size={24} />
+      {/* Floating Action Button */}
+      <button 
+        onClick={() => setShowForm(true)} 
+        className="fixed bottom-6 right-6 w-16 h-16 bg-slate-900 text-white rounded-[1.75rem] shadow-2xl flex items-center justify-center z-40 border-4 border-white active:scale-90 transition-all hover:bg-indigo-600 shadow-indigo-200"
+      >
+        <PlusCircle size={28} />
       </button>
 
       {showSync && <SyncModal transactions={transactions} onImport={handleImportTransactions} onClose={() => setShowSync(false)} />}
+      
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-end md:items-center justify-center">
-          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] p-8 shadow-2xl overflow-y-auto max-h-[95vh] animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">নতুন হিসাব যোগ করুন</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 text-slate-400">
+              <div>
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">হিসাব যোগ করুন</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">নতুন লেনদেনের বিবরণ দিন</p>
+              </div>
+              <button onClick={() => setShowForm(false)} className="p-2 bg-slate-50 rounded-xl text-slate-400 hover:text-slate-600 transition-colors">
                 <PlusCircle size={24} className="rotate-45" />
               </button>
             </div>

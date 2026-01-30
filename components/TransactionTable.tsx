@@ -51,17 +51,19 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(tx.id);
-                    }}
-                    className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 rounded-xl transition-all active:scale-90 inline-flex items-center justify-center border border-slate-100"
-                    aria-label="মুছে ফেলুন"
-                    title="মুছে ফেলুন"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center justify-end">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(tx.id);
+                      }}
+                      className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 rounded-xl transition-all active:scale-90 inline-flex items-center justify-center border border-slate-100"
+                      aria-label="মুছে ফেলুন"
+                      title="মুছে ফেলুন"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -11,7 +11,6 @@ interface SyncModalProps {
 
 const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }) => {
   
-  // Unicode safe Base64 encoding (বাংলা অক্ষরের জন্য প্রয়োজন)
   const toBase64 = (str: string) => {
     try {
       return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
@@ -23,7 +22,6 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
     }
   };
 
-  // Unicode safe Base64 decoding
   const fromBase64 = (str: string) => {
     try {
       return decodeURIComponent(atob(str).split('').map((c) => {
@@ -40,31 +38,21 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
       alert('কপি করার জন্য কোনো ডাটা নেই।');
       return;
     }
-
     const jsonStr = JSON.stringify(transactions);
     const code = toBase64(jsonStr);
-
-    if (!code) {
-      alert('কোড তৈরি করতে সমস্যা হয়েছে।');
-      return;
-    }
+    if (!code) return;
 
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(code);
-        alert('কোডটি ক্লিপবোর্ডে কপি করা হয়েছে। অন্য ডিভাইসে এটি পেস্ট করুন।');
-      } else {
-        // Fallback for browsers that don't support navigator.clipboard
-        const textArea = document.createElement("textarea");
-        textArea.value = code;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-        alert('কোডটি কপি করা হয়েছে।');
-      }
+      await navigator.clipboard.writeText(code);
+      alert('কোডটি কপি করা হয়েছে।');
     } catch (err) {
-      alert('কপি করা সম্ভব হয়নি। ম্যানুয়ালি ফাইল ব্যাকআপ ব্যবহার করুন।');
+      const textArea = document.createElement("textarea");
+      textArea.value = code;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      alert('কোডটি কপি করা হয়েছে।');
     }
   };
 
@@ -74,26 +62,21 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
     
     try {
       const decodedStr = fromBase64(code.trim());
-      if (!decodedStr) throw new Error('Invalid base64');
-      
+      if (!decodedStr) throw new Error('Invalid data');
       const decoded = JSON.parse(decodedStr);
       if (Array.isArray(decoded)) {
-        if (window.confirm(`${decoded.length}টি হিসাব পাওয়া গেছে। আপনি কি এগুলো ইমপোর্ট করতে চান?`)) {
+        if (window.confirm(`${decoded.length}টি হিসাব ইমপোর্ট করতে চান?`)) {
           onImport(decoded);
-          alert('সফলভাবে ইমপোর্ট হয়েছে!');
         }
-      } else {
-        throw new Error('Invalid data format');
       }
     } catch (e) {
-      alert('ভুল কোড দেওয়া হয়েছে। দয়া করে সঠিক কোডটি কপি করে আনুন।');
-      console.error('Import error:', e);
+      alert('ভুল কোড দেওয়া হয়েছে।');
     }
   };
 
   const handleDownloadFile = () => {
     if (transactions.length === 0) {
-      alert('ডাউনলোড করার জন্য কোনো ডাটা নেই।');
+      alert('কোনো ডাটা নেই।');
       return;
     }
     const dataStr = JSON.stringify(transactions, null, 2);
@@ -101,7 +84,7 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `ShopBackup_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `ShopBackup.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -109,7 +92,6 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
   const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -117,83 +99,51 @@ const SyncModal: React.FC<SyncModalProps> = ({ transactions, onImport, onClose }
         const decoded = JSON.parse(result);
         if (Array.isArray(decoded)) {
           onImport(decoded);
-          alert('ফাইল থেকে ডাটা সফলভাবে নেওয়া হয়েছে!');
-        } else {
-          throw new Error('Invalid format');
         }
       } catch (err) {
-        alert('ফাইলের ফরম্যাট সঠিক নয়। শুধুমাত্র .json ফাইল আপলোড করুন।');
+        alert('সঠিক ফাইল নয়।');
       }
     };
     reader.readAsText(file);
-    // Reset input value to allow uploading same file again
     e.target.value = '';
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl p-8 relative overflow-hidden animate-in zoom-in-95 duration-200">
-        
-        {/* Icon Header */}
+    <div className="fixed inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl p-8 my-auto">
         <div className="flex justify-center mb-6">
-          <div className="bg-emerald-50 p-6 rounded-3xl">
-            <RefreshCw size={48} className="text-emerald-500" />
+          <div className="bg-emerald-50 p-5 rounded-3xl text-emerald-500">
+            <RefreshCw size={40} />
           </div>
         </div>
 
-        {/* Content */}
-        <div className="text-center space-y-2 mb-8">
-          <h2 className="text-3xl font-bold text-slate-800 tracking-tighter">ডাটা সিঙ্কিং</h2>
-          <p className="text-slate-500 text-sm px-4">
-            অন্য ডিভাইসে আপনার সব হিসাব ট্রান্সফার করার জন্য নিচের অপশনগুলো ব্যবহার করুন।
-          </p>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight">ডাটা সিঙ্কিং</h2>
+          <p className="text-slate-500 text-xs mt-2 px-2">অন্য ডিভাইসে আপনার সব হিসাব ট্রান্সফার করুন।</p>
         </div>
 
-        {/* Option 1: Code */}
-        <div className="space-y-3 mb-8">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">অপশন ১: কোড ব্যবহার করুন</p>
-          <button 
-            onClick={handleExportCode}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-emerald-200"
-          >
-            <Copy size={20} />
-            কোড কপি করুন (Export)
+        <div className="space-y-3 mb-6">
+          <button onClick={handleExportCode} className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
+            <Copy size={18} /> কোড কপি করুন
           </button>
-          <button 
-            onClick={handleImportCode}
-            className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
-          >
-            <Clipboard size={20} />
-            কোড পেস্ট করুন (Import)
+          <button onClick={handleImportCode} className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
+            <Clipboard size={18} /> কোড পেস্ট করুন
           </button>
         </div>
 
-        {/* Option 2: File */}
-        <div className="space-y-3 mb-10 pt-4 border-t border-slate-100">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">অপশন ২: ফাইল ব্যাকআপ (বেশি নিরাপদ)</p>
-          <button 
-            onClick={handleDownloadFile}
-            className="w-full bg-[#1e293b] hover:bg-[#0f172a] text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl"
-          >
-            <Download size={20} />
-            ফাইল ডাউনলোড করুন
+        <div className="space-y-3 mb-8 pt-4 border-t border-slate-100">
+          <button onClick={handleDownloadFile} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform">
+            <Download size={18} /> ফাইল ডাউনলোড
           </button>
-          <label className="w-full bg-[#f0fdf4] hover:bg-[#dcfce7] text-emerald-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer">
-            <Upload size={20} />
-            ফাইল আপলোড করুন
+          <label className="w-full bg-emerald-50 text-emerald-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-transform">
+            <Upload size={18} /> ফাইল আপলোড
             <input type="file" accept=".json" onChange={handleUploadFile} className="hidden" />
           </label>
         </div>
 
-        {/* Close Button */}
-        <div className="text-center">
-          <button 
-            onClick={onClose}
-            className="text-slate-400 font-bold hover:text-slate-600 transition-colors py-2 px-4"
-          >
-            বন্ধ করুন
-          </button>
-        </div>
+        <button onClick={onClose} className="w-full text-slate-400 font-bold py-2 hover:text-slate-600 transition-colors">
+          বন্ধ করুন
+        </button>
       </div>
     </div>
   );

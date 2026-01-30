@@ -39,7 +39,6 @@ const App: React.FC = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  // চেক সেশন
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -128,8 +127,6 @@ const App: React.FC = () => {
     }
 
     setLoading(true);
-    
-    // ডাটা ক্লিজিং এবং বর্তমান ইউজার আইডির সাথে ম্যাপিং
     const transactionsToInsert = importedData.map(tx => ({
       id: crypto.randomUUID(),
       description: tx.description || 'বিবরণ নেই',
@@ -159,7 +156,6 @@ const App: React.FC = () => {
 
   const deleteTransaction = async (id: string) => {
     if (!id) return;
-    
     if (window.confirm('আপনি কি নিশ্চিত যে এই হিসাবটি মুছে ফেলবেন?')) {
       const { error } = await supabase
         .from('transactions')
@@ -221,7 +217,7 @@ const App: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center space-y-4">
           <Loader2 className="w-10 h-10 text-slate-900 animate-spin mx-auto" />
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">লোডিং হচ্ছে...</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">লোডিং হচ্ছে...</p>
         </div>
       </div>
     );
@@ -232,7 +228,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-20 md:pb-10 bg-slate-50 animate-in fade-in duration-500">
+    <div className="min-h-screen pb-20 md:pb-10 bg-slate-50 overflow-x-hidden">
       <header className="bg-white shadow-sm sticky top-0 z-30 px-4 py-3 border-b border-slate-100">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -240,8 +236,8 @@ const App: React.FC = () => {
               <Wallet size={18} />
             </div>
             <div>
-              <h1 className="text-xs font-black text-slate-900 uppercase tracking-tighter">RASAL SHOP AI</h1>
-              <p className="text-[9px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1">
+              <h1 className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">RASAL SHOP AI</h1>
+              <p className="text-[8px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1">
                 <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
                 Supabase Online
               </p>
@@ -251,27 +247,25 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowSync(true)}
-              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-              title="Sync Data"
+              className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl transition-all"
             >
               <Database size={18} />
             </button>
             <button 
               onClick={fetchTransactions}
-              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-              title="Refresh"
+              className="p-2 text-slate-400 hover:text-blue-600 rounded-xl transition-all"
             >
               <RefreshCw size={18} />
             </button>
             <div className="relative">
               <button 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 pl-1 pr-2 py-1 bg-slate-100 rounded-full border border-slate-200 hover:bg-slate-200 transition-colors"
+                className="flex items-center gap-2 pl-1 pr-2 py-1 bg-slate-100 rounded-full border border-slate-200"
               >
                 <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
                   {user.name[0].toUpperCase()}
                 </div>
-                <ChevronDown size={12} className={`text-slate-400 ${showProfileMenu ? 'rotate-180' : ''}`} />
+                <ChevronDown size={12} className="text-slate-400" />
               </button>
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2">
@@ -299,7 +293,7 @@ const App: React.FC = () => {
           />
         </div>
 
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-blue-300" />
@@ -337,14 +331,14 @@ const App: React.FC = () => {
         </section>
       </main>
 
-      <button onClick={() => setShowForm(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center z-40 border-4 border-white">
+      <button onClick={() => setShowForm(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center z-40 border-4 border-white active:scale-90 transition-transform">
         <PlusCircle size={24} />
       </button>
 
       {showSync && <SyncModal transactions={transactions} onImport={handleImportTransactions} onClose={() => setShowSync(false)} />}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center">
-          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-end md:items-center justify-center">
+          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">নতুন হিসাব যোগ করুন</h2>
               <button onClick={() => setShowForm(false)} className="p-2 text-slate-400">

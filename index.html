@@ -13,6 +13,10 @@
             background-color: #f8fafc;
         }
     </style>
+    <!-- প্রসেস ভেরিয়েবল ডিফাইন করা হয়েছে যাতে ব্রাউজারে এরর না আসে -->
+    <script>
+        window.process = { env: { API_KEY: '' } };
+    </script>
 <script type="importmap">
 {
   "imports": {
@@ -21,6 +25,7 @@
     "react": "https://esm.sh/react@^19.2.3",
     "react/": "https://esm.sh/react@^19.2.3/",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
     "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.1"
   }
@@ -29,5 +34,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <!-- এই লাইনটি অ্যাপটি শুরু করার জন্য অত্যন্ত গুরুত্বপূর্ণ -->
+    <script type="module" src="index.tsx"></script>
 </body>
 </html>

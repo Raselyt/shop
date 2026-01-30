@@ -14,15 +14,15 @@ import {
   Loader2,
   Database
 } from 'lucide-react';
-import { Transaction, TransactionType, User } from './types';
-import TransactionForm from './components/TransactionForm';
-import DashboardCards from './components/DashboardCards';
-import TrendsChart from './components/TrendsChart';
-import TransactionTable from './components/TransactionTable';
-import SyncModal from './components/SyncModal';
-import AuthScreen from './components/AuthScreen';
-import AIService from './services/geminiService';
-import { supabase } from './lib/supabase';
+import { Transaction, TransactionType, User } from './types.ts';
+import TransactionForm from './components/TransactionForm.tsx';
+import DashboardCards from './components/DashboardCards.tsx';
+import TrendsChart from './components/TrendsChart.tsx';
+import TransactionTable from './components/TransactionTable.tsx';
+import SyncModal from './components/SyncModal.tsx';
+import AuthScreen from './components/AuthScreen.tsx';
+import AIService from './services/geminiService.ts';
+import { supabase } from './lib/supabase.ts';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -109,7 +109,6 @@ const App: React.FC = () => {
   const addTransaction = async (newTx: Transaction) => {
     if (!user) return;
     
-    // ডাটাবেসে সেভ করা এবং রেসপন্স থেকে সঠিক ডাটা (আইডিসহ) নেওয়া
     const { data, error } = await supabase
       .from('transactions')
       .insert([newTx])
@@ -117,54 +116,25 @@ const App: React.FC = () => {
 
     if (error) {
       alert(`ডাটা সেভ হয়নি: ${error.message}`);
-      console.error('Insert error:', error);
     } else if (data && data.length > 0) {
-      // স্টেট আপডেট যাতে নতুন আইটেমটি সবার উপরে থাকে
       setTransactions(prev => [data[0], ...prev]);
       setShowForm(false);
     }
-  };
-
-  const handleImportData = async (importedData: Transaction[]) => {
-    if (!user) return;
-    
-    setLoading(true);
-    const dataToInsert = importedData.map(item => ({
-      ...item,
-      id: crypto.randomUUID(), 
-      userId: user.id
-    }));
-
-    const { error } = await supabase
-      .from('transactions')
-      .insert(dataToInsert);
-
-    if (error) {
-      alert(`ইমপোর্ট ব্যর্থ: ${error.message}`);
-    } else {
-      alert('সব ডাটা সফলভাবে ইমপোর্ট হয়েছে!');
-      fetchTransactions();
-    }
-    setLoading(false);
-    setShowSync(false);
   };
 
   const deleteTransaction = async (id: string) => {
     if (!id) return;
     
     if (window.confirm('আপনি কি নিশ্চিত যে এই হিসাবটি মুছে ফেলবেন?')) {
-      // ডাটাবেস থেকে ডিলিট করার রিকোয়েস্ট
       const { error } = await supabase
         .from('transactions')
         .delete()
         .eq('id', id)
-        .eq('userId', user?.id); // সুরক্ষার জন্য ইউজার আইডি চেক
+        .eq('userId', user?.id);
 
       if (error) {
-        alert(`মুছে ফেলা যায়নি: ${error.message}\nটিপস: আপনার SQL Editor-এ DELETE পলিসি রান করা আছে কি না চেক করুন।`);
-        console.error('Delete error:', error);
+        alert(`মুছে ফেলা যায়নি। নিশ্চিত করুন যে সুপাবেজে ডিলিট পলিসি সেট করা আছে।`);
       } else {
-        // ডাটাবেস থেকে ডিলিট সফল হলে স্টেট থেকে রিমুভ করা
         setTransactions(prev => prev.filter(t => t.id !== id));
       }
     }
@@ -244,19 +214,15 @@ const App: React.FC = () => {
             <button 
               onClick={() => setShowSync(true)}
               className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-              title="Data Sync & Backup"
             >
               <Database size={18} />
             </button>
-            
             <button 
               onClick={fetchTransactions}
               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-              title="Refresh Data"
             >
               <RefreshCw size={18} />
             </button>
-            
             <div className="relative">
               <button 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -265,27 +231,14 @@ const App: React.FC = () => {
                 <div className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-white text-[10px] font-bold">
                   {user.name[0].toUpperCase()}
                 </div>
-                <span className="text-[10px] font-bold text-slate-700 hidden sm:inline">{user.name}</span>
-                <ChevronDown size={12} className={`text-slate-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+                <ChevronDown size={12} className={`text-slate-400 ${showProfileMenu ? 'rotate-180' : ''}`} />
               </button>
-
               {showProfileMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)}></div>
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2 animate-in zoom-in-95 duration-150">
-                    <div className="px-3 py-2 border-b border-slate-50 mb-1">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase">ইউজার ইমেইল</p>
-                      <p className="text-[11px] font-bold text-slate-800 truncate">{user.email}</p>
-                    </div>
-                    <button 
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors text-xs font-bold"
-                    >
-                      <LogOut size={16} />
-                      লগআউট করুন
-                    </button>
-                  </div>
-                </>
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2">
+                  <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors text-xs font-bold">
+                    <LogOut size={16} /> লগআউট করুন
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -293,7 +246,6 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
-        {/* Month Selector */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Calendar size={18} className="text-slate-400" />
@@ -303,31 +255,19 @@ const App: React.FC = () => {
             type="month" 
             value={viewDate}
             onChange={(e) => setViewDate(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-900"
+            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none"
           />
         </div>
 
-        {/* AI Section */}
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform">
-            <Sparkles size={120} />
-          </div>
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
           <div className="relative z-10 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-white/10 rounded-lg">
-                <Sparkles size={16} className="text-blue-300" />
-              </div>
+              <Sparkles size={16} className="text-blue-300" />
               <h3 className="text-sm font-bold">AI বিজনেস ইনসাইট</h3>
             </div>
-            
-            {aiInsight ? (
-              <p className="text-xs leading-relaxed text-slate-200 animate-in fade-in slide-in-from-left duration-300">
-                {aiInsight}
-              </p>
-            ) : (
-              <p className="text-[11px] text-slate-400 uppercase tracking-widest font-bold">এই মাসের হিসাব বিশ্লেষণ করতে বাটনটি চাপুন</p>
-            )}
-
+            <p className="text-xs leading-relaxed text-slate-200">
+              {aiInsight || "এই মাসের হিসাব বিশ্লেষণ করতে নিচের বাটনটি চাপুন।"}
+            </p>
             <button 
               onClick={handleGetAiInsight}
               disabled={isAiLoading}
@@ -342,8 +282,7 @@ const App: React.FC = () => {
 
         <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-            <TrendingUp size={14} className="text-emerald-500" />
-            প্রবৃদ্ধি গ্রাফ
+            <TrendingUp size={14} className="text-emerald-500" /> প্রবৃদ্ধি গ্রাফ
           </h2>
           <div className="h-64 w-full">
             <TrendsChart transactions={filteredTransactions} />
@@ -352,34 +291,23 @@ const App: React.FC = () => {
 
         <section className="space-y-4">
           <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            <History size={14} className="text-slate-500" />
-            লেনদেনসমূহ
+            <History size={14} className="text-slate-500" /> লেনদেনসমূহ
           </h2>
           <TransactionTable transactions={filteredTransactions} onDelete={deleteTransaction} />
         </section>
       </main>
 
-      <button 
-        onClick={() => setShowForm(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center hover:scale-110 transition-all active:scale-95 z-40 border-4 border-white"
-      >
+      <button onClick={() => setShowForm(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center z-40 border-4 border-white">
         <PlusCircle size={24} />
       </button>
 
-      {showSync && (
-        <SyncModal 
-          transactions={transactions} 
-          onImport={handleImportData} 
-          onClose={() => setShowSync(false)} 
-        />
-      )}
-
+      {showSync && <SyncModal transactions={transactions} onImport={fetchTransactions} onClose={() => setShowSync(false)} />}
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] shadow-2xl p-10 animate-in slide-in-from-bottom duration-300 overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center">
+          <div className="bg-white w-full md:max-w-md rounded-t-[3rem] md:rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-lg font-black text-slate-900 uppercase tracking-tighter">নতুন হিসাব যোগ করুন</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 text-slate-400 hover:text-slate-900">
+              <button onClick={() => setShowForm(false)} className="p-2 text-slate-400">
                 <PlusCircle size={24} className="rotate-45" />
               </button>
             </div>

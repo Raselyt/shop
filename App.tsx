@@ -13,7 +13,9 @@ import {
   Database,
   LayoutDashboard,
   CreditCard,
-  Plus
+  Plus,
+  ArrowUpRight,
+  CircleDollarSign
 } from 'lucide-react';
 import { Transaction, TransactionType, User } from './types.ts';
 import TransactionForm from './components/TransactionForm.tsx';
@@ -42,6 +44,8 @@ const App: React.FC = () => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+
+  const [selectedDay, setSelectedDay] = useState(() => new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -82,7 +86,6 @@ const App: React.FC = () => {
     if (error) {
       console.error('Error fetching transactions:', error);
     } else {
-      // ডাটাবেস থেকে পাওয়া 'Income' + '__CARD__' কে আবার UI এর জন্য 'Card' এ রূপান্তর করা
       const mappedData = (data || []).map(t => {
         if (t.type === 'Income' && t.category === '__CARD__') {
           return { ...t, type: TransactionType.CARD_PAYMENT, category: 'কার্ড পেমেন্ট' };
@@ -98,22 +101,12 @@ const App: React.FC = () => {
     if (user) fetchTransactions();
   }, [user, fetchTransactions]);
 
-  const handleLogin = (newUser: User) => setUser(newUser);
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setTransactions([]);
-    setAiInsight(null);
-    setShowProfileMenu(false);
-  };
-
   const addTransaction = async (newTx: Transaction) => {
     if (!user) return;
 
-    // ডাটাবেস সেভ করার আগে টাইপ পরিবর্তন করা (যদি কার্ড হয়) যাতে 'transactions_type_check' এরর না আসে
     const dbPayload = { ...newTx };
     if (dbPayload.type === TransactionType.CARD_PAYMENT) {
-      // @ts-ignore: ডাটাবেস কনস্ট্রেইন্ট এড়াতে কাস্টম ম্যাপিং
+      // @ts-ignore
       dbPayload.type = 'Income'; 
       dbPayload.category = '__CARD__'; 
     }
@@ -123,7 +116,6 @@ const App: React.FC = () => {
     if (error) {
       alert(`ডাটা সেভ হয়নি: ${error.message}`);
     } else if (data && data.length > 0) {
-      // UI তে দেখানোর সময় আবার Card বানিয়ে দিচ্ছি
       const savedTx = data[0];
       if (savedTx.type === 'Income' && savedTx.category === '__CARD__') {
         savedTx.type = TransactionType.CARD_PAYMENT;
@@ -133,11 +125,11 @@ const App: React.FC = () => {
       setTransactions(prev => [savedTx, ...prev]);
       setShowForm(false);
       
-      // অটোমেটিকালি সংশ্লিষ্ট মাসের ভিউতে চলে যাওয়া
       const txMonth = savedTx.date.substring(0, 7);
       if (viewDate !== txMonth) {
         setViewDate(txMonth);
       }
+      setSelectedDay(savedTx.date);
     }
   };
 
@@ -150,21 +142,16 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGetAiInsight = async () => {
-    if (filteredTransactions.length === 0) {
-      setAiInsight("বিশ্লেষণের জন্য এই মাসে কোনো ডাটা নেই।");
-      return;
-    }
-    setIsAiLoading(true);
-    try {
-      const insight = await AIService.analyzeBusiness(filteredTransactions);
-      setAiInsight(insight);
-    } catch (err) {
-      setAiInsight("AI বিশ্লেষণ ব্যর্থ হয়েছে।");
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
+  const dailyStats = useMemo(() => {
+    const dayTx = transactions.filter(t => t.date === selectedDay);
+    const cash = dayTx
+      .filter(t => t.type === TransactionType.INCOME)
+      .reduce((sum, t) => sum + t.amount, 0);
+    const card = dayTx
+      .filter(t => t.type === TransactionType.CARD_PAYMENT)
+      .reduce((sum, t) => sum + t.amount, 0);
+    return { cash, card, total: cash + card };
+  }, [transactions, selectedDay]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => t.date.startsWith(viewDate));
@@ -178,7 +165,6 @@ const App: React.FC = () => {
     const cashIncome = filteredTransactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
     const cardIncome = cardTransactions.reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
-    // নগদ লাভ = নগদ আয় - মোট খরচ
     const cashProfit = cashIncome - totalExpense;
     return { income: cashIncome, card: cardIncome, expense: totalExpense, profit: cashProfit };
   }, [filteredTransactions, cardTransactions]);
@@ -189,9 +175,30 @@ const App: React.FC = () => {
     return date.toLocaleDateString('bn-BD', { month: 'long', year: 'numeric' });
   };
 
+  const getDisplayDay = () => {
+    return new Date(selectedDay).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const openForm = (type: TransactionType) => {
     setFormType(type);
     setShowForm(true);
+  };
+
+  // Fixed handleLogin: Update user state when AuthScreen signals successful authentication
+  const handleLogin = (loggedUser: User) => {
+    setUser(loggedUser);
+  };
+
+  // Fixed handleLogout: Sign out via Supabase and clear local state
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error signing out:', error);
+    } else {
+      setUser(null);
+      setTransactions([]);
+      setShowProfileMenu(false);
+    }
   };
 
   if (loading) return (
@@ -232,11 +239,70 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-4 space-y-6">
+      <main className="max-w-4xl mx-auto p-4 space-y-4">
+        {/* আজকের ইনকাম ডিসপ্লে কার্ড - ব্রেকডাউন সহ */}
+        <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 overflow-hidden relative group transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-900 p-2.5 rounded-xl text-white">
+                <Calendar size={18} />
+              </div>
+              <div>
+                <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">তারিখ অনুযায়ী হিসাব</h2>
+                <p className="text-xs font-bold text-slate-800 mt-1">{getDisplayDay()}</p>
+              </div>
+            </div>
+            <div className="relative">
+              <input 
+                type="date" 
+                value={selectedDay} 
+                onChange={(e) => setSelectedDay(e.target.value)} 
+                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10" 
+              />
+              <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-[10px] font-black text-slate-600 uppercase flex items-center gap-2 pointer-events-none hover:bg-slate-100 transition-colors">
+                তারিখ বদলান
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-1 px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
+                  <CreditCard size={14} />
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">কার্ড পেমেন্ট</span>
+              </div>
+              <span className="text-sm font-black text-blue-600">€{dailyStats.card.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1 px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                  <CircleDollarSign size={14} />
+                </div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">নগদ ইনকাম</span>
+              </div>
+              <span className="text-sm font-black text-emerald-600">€{dailyStats.cash.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex items-end justify-between px-1">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                  <ArrowUpRight size={12} className="text-emerald-500" /> আজকের মোট ইনকাম
+                </p>
+                <h3 className="text-3xl font-black text-slate-900 tracking-tight">€{dailyStats.total.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</h3>
+              </div>
+              <div className="h-12 w-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner">
+                <TrendingUp size={24} />
+              </div>
+            </div>
+          </div>
+        </section>
+
         <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Calendar size={18} className="text-slate-400" />
-            <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter">{getDisplayMonth()}</h2>
+            <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest">মাসিক রিপোর্ট: {getDisplayMonth()}</h2>
           </div>
           <input type="month" value={viewDate} onChange={(e) => setViewDate(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none" />
         </div>
@@ -244,19 +310,6 @@ const App: React.FC = () => {
         {activeTab === 'dashboard' ? (
           <div className="space-y-6 animate-in fade-in duration-500">
             <DashboardCards stats={stats} />
-
-            <div className="bg-slate-900 rounded-[2.5rem] p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center gap-2 text-blue-300">
-                  <Sparkles size={16} />
-                  <h3 className="text-sm font-bold">AI বিজনেস ইন্টেলিজেন্স</h3>
-                </div>
-                <p className="text-xs leading-relaxed text-slate-200">{aiInsight || "লেনদেন বিশ্লেষণ করতে নিচের বাটনে ক্লিক করুন।"}</p>
-                <button onClick={handleGetAiInsight} disabled={isAiLoading} className="bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest px-8 py-3.5 rounded-2xl active:scale-95 disabled:opacity-50 flex items-center gap-2 shadow-lg">
-                  {isAiLoading ? <RefreshCw size={14} className="animate-spin" /> : 'বিশ্লেষণ করুন'}
-                </button>
-              </div>
-            </div>
 
             <section className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
               <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">

@@ -1,27 +1,43 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType } from '../types';
+import { Info } from 'lucide-react';
 
 interface TransactionFormProps {
   onAdd: (tx: Transaction) => void;
   userId: string;
+  initialType?: TransactionType;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initialType }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<TransactionType>(TransactionType.INCOME);
+  const [type, setType] = useState<TransactionType>(initialType || TransactionType.INCOME);
   const [category, setCategory] = useState('পণ্য বিক্রয়');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // বাটন অনুযায়ী ফর্মের টাইপ আপডেট করা
+  useEffect(() => {
+    if (initialType) {
+      setType(initialType);
+    }
+  }, [initialType]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!description || !amount) return;
 
+    let finalAmount = parseFloat(amount);
+    
+    // কার্ড পেমেন্টের ক্ষেত্রে ২% ফি বাদ দেওয়া হচ্ছে
+    if (type === TransactionType.CARD_PAYMENT) {
+      finalAmount = finalAmount * 0.98; // ২% মাইনাস
+    }
+
     const newTx: Transaction = {
       id: crypto.randomUUID(),
       description,
-      amount: parseFloat(amount),
+      amount: finalAmount,
       type,
       category,
       date,
@@ -33,6 +49,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
     setAmount('');
   };
 
+  const getPreviewAmount = () => {
+    const val = parseFloat(amount);
+    if (isNaN(val)) return null;
+    if (type === TransactionType.CARD_PAYMENT) {
+      return (val * 0.98).toFixed(2);
+    }
+    return null;
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
@@ -41,8 +66,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
           type="text" 
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="যেমন: আজকের মোট বিক্রি বা দোকান ভাড়া"
-          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold focus:ring-4 focus:ring-blue-50 focus:border-blue-400 outline-none transition-all placeholder:text-slate-300"
+          placeholder="যেমন: আজকের মোট বিক্রি"
+          className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-50 transition-all"
           required
         />
       </div>
@@ -58,20 +83,26 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold focus:ring-4 focus:ring-blue-50 focus:border-blue-400 outline-none transition-all"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none"
               required
             />
           </div>
+          {getPreviewAmount() && (
+            <p className="text-[10px] text-blue-600 font-bold mt-1 flex items-center gap-1">
+              <Info size={12} /> নিট পাবেন: €{getPreviewAmount()}
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">লেনদেনের ধরন</label>
           <select 
             value={type}
             onChange={(e) => setType(e.target.value as TransactionType)}
-            className={`w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none transition-all cursor-pointer ${type === TransactionType.INCOME ? 'text-emerald-600 focus:border-emerald-400' : 'text-rose-600 focus:border-rose-400'}`}
+            className={`w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm font-bold outline-none ${type === TransactionType.CARD_PAYMENT ? 'text-blue-600 border-blue-200' : ''}`}
           >
-            <option value={TransactionType.INCOME}>আয় (বিক্রি)</option>
-            <option value={TransactionType.EXPENSE}>ব্যয় (খরচ)</option>
+            <option value={TransactionType.INCOME}>নগদ আয় (Cash)</option>
+            <option value={TransactionType.CARD_PAYMENT}>কার্ড পেমেন্ট (Card)</option>
+            <option value={TransactionType.EXPENSE}>ব্যয় (Expense)</option>
           </select>
         </div>
       </div>
@@ -82,12 +113,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
           <select 
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold focus:ring-4 focus:ring-blue-50 focus:border-blue-400 outline-none transition-all cursor-pointer"
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold outline-none"
           >
             <option value="পণ্য বিক্রয়">পণ্য বিক্রয়</option>
             <option value="দোকান খরচ">দোকান খরচ</option>
-            <option value="পণ্য ক্রয়">পণ্য ক্রয়</option>
-            <option value="বেতন">বেতন</option>
             <option value="বিল">বিল/ভাড়া</option>
             <option value="অন্যান্য">অন্যান্য</option>
           </select>
@@ -98,7 +127,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
             type="date" 
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold focus:ring-4 focus:ring-blue-50 focus:border-blue-400 outline-none transition-all cursor-pointer"
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold outline-none"
             required
           />
         </div>
@@ -106,7 +135,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId }) => {
 
       <button 
         type="submit"
-        className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-5 rounded-[1.5rem] shadow-xl shadow-slate-200 hover:bg-indigo-600 hover:shadow-indigo-100 transition-all active:scale-[0.98] mt-2 flex items-center justify-center gap-2"
+        className="w-full bg-slate-900 text-white font-black uppercase tracking-widest py-5 rounded-[1.5rem] shadow-xl hover:bg-indigo-600 transition-all active:scale-[0.98]"
       >
         সেভ করুন
       </button>

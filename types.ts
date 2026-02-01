@@ -1,7 +1,8 @@
 
 export enum TransactionType {
   INCOME = 'Income',
-  EXPENSE = 'Expense'
+  EXPENSE = 'Expense',
+  CARD_PAYMENT = 'Card'
 }
 
 export interface Transaction {
@@ -11,7 +12,7 @@ export interface Transaction {
   type: TransactionType;
   category: string;
   date: string;
-  userId: string; // ট্রানজ্যাকশনটি কোন ইউজারের তা চেনার জন্য
+  userId: string;
 }
 
 export interface User {

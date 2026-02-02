@@ -1,14 +1,15 @@
 
 import React from 'react';
 import { Transaction, TransactionType } from '../types';
-import { Trash2, ShoppingBag, ArrowUpRight, ArrowDownRight, CreditCard } from 'lucide-react';
+import { Trash2, ShoppingBag, ArrowUpRight, ArrowDownRight, CreditCard, Edit3 } from 'lucide-react';
 
 interface TransactionTableProps {
   transactions: Transaction[];
   onDelete: (id: string) => void;
+  onEdit: (tx: Transaction) => void;
 }
 
-const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDelete }) => {
+const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDelete, onEdit }) => {
   if (transactions.length === 0) {
     return (
       <div className="bg-white rounded-[2rem] p-12 text-center border border-slate-100 shadow-sm">
@@ -52,7 +53,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
                 <tr key={tx.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl ${styles.colorClass} shadow-sm group-hover:scale-110 transition-transform`}>
+                      <div className={`p-3 rounded-2xl ${styles.colorClass} shadow-sm transition-transform`}>
                         {styles.icon}
                       </div>
                       <div>
@@ -78,12 +79,18 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-6 py-5 text-right flex items-center justify-end gap-2">
+                    <button 
+                      onClick={() => onEdit(tx)} 
+                      className="p-2.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 bg-slate-50/50 rounded-xl transition-all border border-transparent hover:border-blue-100"
+                    >
+                      <Edit3 size={16} />
+                    </button>
                     <button 
                       onClick={() => onDelete(tx.id)} 
-                      className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 bg-slate-50/50 rounded-2xl transition-all border border-transparent hover:border-rose-100"
+                      className="p-2.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 bg-slate-50/50 rounded-xl transition-all border border-transparent hover:border-rose-100"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={16} />
                     </button>
                   </td>
                 </tr>

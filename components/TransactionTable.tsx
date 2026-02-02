@@ -34,14 +34,14 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
   };
 
   return (
-    <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50">
-              <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">বিবরণ ও তারিখ</th>
-              <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">পরিমাণ (€)</th>
-              <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">অ্যাকশন</th>
+              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">বিবরণ ও তারিখ</th>
+              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">পরিমাণ (€)</th>
+              <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">অ্যাকশন</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -50,35 +50,40 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
               const isCard = tx.type === TransactionType.CARD_PAYMENT;
               return (
                 <tr key={tx.id} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-5">
                     <div className="flex items-center gap-4">
-                      <div className={`p-2.5 rounded-xl ${styles.colorClass} shadow-sm`}>
+                      <div className={`p-3 rounded-2xl ${styles.colorClass} shadow-sm group-hover:scale-110 transition-transform`}>
                         {styles.icon}
                       </div>
                       <div>
                         <p className="text-sm font-bold text-slate-800 line-clamp-1">{tx.description}</p>
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                           {new Date(tx.date).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short' })} • 
-                          <span className={`ml-1 px-1.5 py-0.5 rounded ${isCard ? 'bg-blue-50 text-blue-500' : 'bg-slate-100'}`}>
+                          <span className={`ml-1 px-2 py-0.5 rounded-full ${isCard ? 'bg-blue-50 text-blue-500' : 'bg-slate-100'}`}>
                             {isCard ? 'কার্ড পেমেন্ট' : tx.category}
                           </span>
                         </p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-5">
                     <div className="flex flex-col">
-                      <span className={`text-sm font-black ${styles.textClass}`}>
+                      <span className={`text-base font-black ${styles.textClass}`}>
                         {styles.label}€{tx.amount.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
                       </span>
+                      {isCard && tx.grossAmount && (
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">
+                          Gross: €{tx.grossAmount.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-right">
+                  <td className="px-6 py-5 text-right">
                     <button 
                       onClick={() => onDelete(tx.id)} 
-                      className="p-2.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 bg-slate-50/50 rounded-xl transition-all border border-transparent hover:border-rose-100"
+                      className="p-3 text-slate-300 hover:text-rose-600 hover:bg-rose-50 bg-slate-50/50 rounded-2xl transition-all border border-transparent hover:border-rose-100"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
                   </td>
                 </tr>

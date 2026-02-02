@@ -37,8 +37,6 @@ const App: React.FC = () => {
   const [showSync, setShowSync] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cards'>('dashboard');
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
   
   const [viewDate, setViewDate] = useState(() => {
     const now = new Date();
@@ -87,6 +85,17 @@ const App: React.FC = () => {
       console.error('Error fetching transactions:', error);
     } else {
       const mappedData = (data || []).map(t => {
+        // ডিকোড করার লজিক: যদি ক্যাটাগরিতে গ্রস অ্যামাউন্ট লুকানো থাকে
+        if (t.category && t.category.startsWith('__CARD_GROSS:')) {
+          const grossValue = parseFloat(t.category.replace('__CARD_GROSS:', '').replace('__', ''));
+          return { 
+            ...t, 
+            type: TransactionType.CARD_PAYMENT, 
+            category: 'কার্ড পেমেন্ট',
+            grossAmount: grossValue 
+          };
+        }
+        // পুরনো ডাটার জন্য ব্যাকওয়ার্ড কম্প্যাটিবিলিটি
         if (t.type === 'Income' && t.category === '__CARD__') {
           return { ...t, type: TransactionType.CARD_PAYMENT, category: 'কার্ড পেমেন্ট' };
         }
@@ -104,11 +113,21 @@ const App: React.FC = () => {
   const addTransaction = async (newTx: Transaction) => {
     if (!user) return;
 
-    const dbPayload = { ...newTx };
-    if (dbPayload.type === TransactionType.CARD_PAYMENT) {
-      // @ts-ignore
+    // ডাটাবেসে সেভ করার জন্য পেলোড তৈরি
+    // যেহেতু grossAmount কলাম নেই, আমরা এটাকে category এর ভেতর এনকোড করবো
+    const dbPayload: any = {
+      description: newTx.description,
+      amount: newTx.amount,
+      type: newTx.type,
+      category: newTx.category,
+      date: newTx.date,
+      userId: newTx.userId
+    };
+
+    if (newTx.type === TransactionType.CARD_PAYMENT) {
       dbPayload.type = 'Income'; 
-      dbPayload.category = '__CARD__'; 
+      // গ্রস অ্যামাউন্টটি ক্যাটাগরির ভেতর ভরে দেওয়া হচ্ছে
+      dbPayload.category = `__CARD_GROSS:${newTx.grossAmount || newTx.amount}__`;
     }
 
     const { data, error } = await supabase.from('transactions').insert([dbPayload]).select();
@@ -116,20 +135,25 @@ const App: React.FC = () => {
     if (error) {
       alert(`ডাটা সেভ হয়নি: ${error.message}`);
     } else if (data && data.length > 0) {
-      const savedTx = data[0];
-      if (savedTx.type === 'Income' && savedTx.category === '__CARD__') {
-        savedTx.type = TransactionType.CARD_PAYMENT;
-        savedTx.category = 'কার্ড পেমেন্ট';
+      const savedRaw = data[0];
+      let processedTx = { ...savedRaw };
+
+      // ইন্টারফেসে দেখানোর জন্য আবার প্রসেস করা
+      if (processedTx.category && processedTx.category.startsWith('__CARD_GROSS:')) {
+        const grossValue = parseFloat(processedTx.category.replace('__CARD_GROSS:', '').replace('__', ''));
+        processedTx.type = TransactionType.CARD_PAYMENT;
+        processedTx.category = 'কার্ড পেমেন্ট';
+        processedTx.grossAmount = grossValue;
       }
       
-      setTransactions(prev => [savedTx, ...prev]);
+      setTransactions(prev => [processedTx, ...prev]);
       setShowForm(false);
       
-      const txMonth = savedTx.date.substring(0, 7);
+      const txMonth = processedTx.date.substring(0, 7);
       if (viewDate !== txMonth) {
         setViewDate(txMonth);
       }
-      setSelectedDay(savedTx.date);
+      setSelectedDay(processedTx.date);
     }
   };
 
@@ -184,12 +208,10 @@ const App: React.FC = () => {
     setShowForm(true);
   };
 
-  // Fixed handleLogin: Update user state when AuthScreen signals successful authentication
   const handleLogin = (loggedUser: User) => {
     setUser(loggedUser);
   };
 
-  // Fixed handleLogout: Sign out via Supabase and clear local state
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -240,7 +262,6 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-4">
-        {/* আজকের ইনকাম ডিসপ্লে কার্ড - ব্রেকডাউন সহ */}
         <section className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 overflow-hidden relative group transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -310,14 +331,12 @@ const App: React.FC = () => {
         {activeTab === 'dashboard' ? (
           <div className="space-y-6 animate-in fade-in duration-500">
             <DashboardCards stats={stats} />
-
             <section className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
               <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <TrendingUp size={14} className="text-emerald-500" /> আয়-ব্যয় গ্রাফ
               </h2>
               <div className="h-64 w-full"><TrendsChart transactions={filteredTransactions} /></div>
             </section>
-
             <section className="space-y-4">
               <div className="flex items-center justify-between px-2">
                 <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">

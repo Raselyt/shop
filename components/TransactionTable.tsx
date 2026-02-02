@@ -71,11 +71,6 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
                       <span className={`text-sm font-black ${styles.textClass}`}>
                         {styles.label}€{tx.amount.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
                       </span>
-                      {isCard && (
-                        <span className="text-[8px] text-slate-300 font-bold uppercase italic mt-0.5">
-                          Net (২% বাদে)
-                        </span>
-                      )}
                     </div>
                   </td>
                   <td className="px-5 py-4 text-right">

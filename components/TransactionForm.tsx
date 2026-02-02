@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType } from '../types';
-import { Info } from 'lucide-react';
 
 interface TransactionFormProps {
   onAdd: (tx: Transaction) => void;
@@ -16,7 +15,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
   const [category, setCategory] = useState('পণ্য বিক্রয়');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // বাটন অনুযায়ী ফর্মের টাইপ আপডেট করা
   useEffect(() => {
     if (initialType) {
       setType(initialType);
@@ -27,13 +25,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
     e.preventDefault();
     if (!description || !amount) return;
 
-    let finalAmount = parseFloat(amount);
+    const finalAmount = parseFloat(amount);
     
-    // কার্ড পেমেন্টের ক্ষেত্রে ২% ফি বাদ দেওয়া হচ্ছে
-    if (type === TransactionType.CARD_PAYMENT) {
-      finalAmount = finalAmount * 0.98; // ২% মাইনাস
-    }
-
     const newTx: Transaction = {
       id: crypto.randomUUID(),
       description,
@@ -49,15 +42,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
     setAmount('');
   };
 
-  const getPreviewAmount = () => {
-    const val = parseFloat(amount);
-    if (isNaN(val)) return null;
-    if (type === TransactionType.CARD_PAYMENT) {
-      return (val * 0.98).toFixed(2);
-    }
-    return null;
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
@@ -66,7 +50,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
           type="text" 
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="যেমন: আজকের মোট বিক্রি"
+          placeholder="যেমন: আজকের কার্ড পেমেন্ট"
           className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-50 transition-all"
           required
         />
@@ -87,11 +71,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
               required
             />
           </div>
-          {getPreviewAmount() && (
-            <p className="text-[10px] text-blue-600 font-bold mt-1 flex items-center gap-1">
-              <Info size={12} /> নিট পাবেন: €{getPreviewAmount()}
-            </p>
-          )}
         </div>
         <div className="space-y-2">
           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">লেনদেনের ধরন</label>

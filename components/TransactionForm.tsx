@@ -34,10 +34,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description || !amount) return;
+    // Gross এবং Description অবশ্যই লাগবে
+    if (!description || (type === TransactionType.CARD_PAYMENT ? !grossAmount : !amount)) return;
 
-    const netValue = parseFloat(amount);
-    const grossValue = grossAmount ? parseFloat(grossAmount) : netValue;
+    const grossValue = grossAmount ? parseFloat(grossAmount) : (amount ? parseFloat(amount) : 0);
+    
+    // যদি Net (amount) খালি থাকে এবং এটি কার্ড পেমেন্ট হয়, তবে গ্রস ভ্যালুকেই নেট হিসেবে ধরা হবে
+    let netValue;
+    if (type === TransactionType.CARD_PAYMENT) {
+      netValue = amount ? parseFloat(amount) : grossValue;
+    } else {
+      netValue = parseFloat(amount);
+    }
     
     const tx: Transaction = {
       id: initialData?.id || crypto.randomUUID(),
@@ -83,21 +91,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
                   type="number" step="0.01" value={grossAmount}
                   onChange={(e) => setGrossAmount(e.target.value)}
                   placeholder="৫৭.০০"
-                  className="w-full bg-blue-50/30 border border-blue-100 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none"
+                  className="w-full bg-blue-50/30 border border-blue-100 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none focus:border-blue-300"
                   required
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-emerald-500 uppercase tracking-wider ml-1">ব্যাংকে জমা (Net)</label>
+              <label className="block text-[11px] font-bold text-emerald-500 uppercase tracking-wider ml-1">ব্যাংকে জমা (ঐচ্ছিক)</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-emerald-300">€</span>
                 <input 
                   type="number" step="0.01" value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder="৫৬.১৫"
-                  className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none"
-                  required
+                  placeholder="পরে লিখুন"
+                  className="w-full bg-emerald-50/30 border border-emerald-100 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none focus:border-emerald-300"
                 />
               </div>
             </div>

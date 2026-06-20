@@ -29,6 +29,10 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
         return { icon: <CreditCard size={16} />, colorClass: 'bg-blue-50 text-blue-600', textClass: 'text-blue-600', label: '+' };
       case TransactionType.EXPENSE:
         return { icon: <ArrowDownRight size={16} />, colorClass: 'bg-rose-50 text-rose-600', textClass: 'text-rose-600', label: '-' };
+      case TransactionType.DOLLAR_BUY:
+        return { icon: <ArrowDownRight size={16} />, colorClass: 'bg-indigo-50 text-indigo-600', textClass: 'text-indigo-600', label: '-' };
+      case TransactionType.DOLLAR_SELL:
+        return { icon: <ArrowUpRight size={16} />, colorClass: 'bg-amber-50 text-amber-600', textClass: 'text-amber-600', label: '+' };
       default:
         return { icon: <ArrowUpRight size={16} />, colorClass: 'bg-slate-50 text-slate-600', textClass: 'text-slate-600', label: '' };
     }
@@ -75,6 +79,11 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions, onDel
                       {isCard && tx.grossAmount && (
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter italic">
                           Gross: €{tx.grossAmount.toFixed(2)}
+                        </span>
+                      )}
+                      {(tx.type === TransactionType.DOLLAR_BUY || tx.type === TransactionType.DOLLAR_SELL) && tx.dollarAmount && (
+                        <span className="text-[9px] font-black text-slate-400 mt-0.5">
+                          ${tx.dollarAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} @ €{tx.dollarRate?.toFixed(2)}
                         </span>
                       )}
                     </div>

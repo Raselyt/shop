@@ -1,6 +1,14 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction } from "../types";
+
+export interface ExtractedDollarTx {
+  id: string;
+  type: 'DOLLAR_BUY' | 'DOLLAR_SELL';
+  dollarAmount: number;
+  dollarRate: number;
+  description: string;
+}
 
 class GeminiService {
   async analyzeBusiness(transactions: Transaction[]): Promise<string> {
@@ -29,7 +37,7 @@ class GeminiService {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.5-flash',
         contents: prompt,
       });
 
@@ -37,6 +45,70 @@ class GeminiService {
     } catch (error) {
       console.error("Gemini Analysis Error:", error);
       return "AI ইঞ্জিন লোড হতে সমস্যা হচ্ছে। দয়া করে ইন্টারনেট কানেকশন চেক করুন।";
+    }
+  }
+
+  async parseDollarTransactions(candidates: { id: string; description: string; amount: number; type: string }[]): Promise<ExtractedDollarTx[]> {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const prompt = `
+      You are an AI data converter. You are given a list of past transactions with descriptions, type (Expense/Income), and Euro amount paid or received.
+      Your task is to identify and extract the dollar trading attributes (USD Amount, Buying/Selling rate) from the Bengali/English descriptions.
+      
+      Guidelines:
+      1. If the original transaction Type is EXPENSE, it was a 'DOLLAR_BUY' (buying USD with Euros).
+      2. If the original transaction Type is INCOME, it was a 'DOLLAR_SELL' (selling USD for Euros).
+      3. Extract the USD numeric amount (e.g. from "600 dollar" or "৬০০ ডলার", extract 600).
+      4. Calculate the exchange rate: Exchange Rate in Euros = Euro Amount / USD Amount.
+      5. Formulate a polite, neat, professional Bengali description (e.g., 'ট্যুরিস্ট থেকে ডলার ক্রয়' or 'গ্রাহকের নিকট ডলার বিক্রয়').
+
+      Candidate Transactions to analyze:
+      ${JSON.stringify(candidates, null, 2)}
+    `;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                type: { 
+                  type: Type.STRING, 
+                  description: "Must be 'DOLLAR_BUY' or 'DOLLAR_SELL'" 
+                },
+                dollarAmount: { 
+                  type: Type.NUMBER, 
+                  description: "Extracted USD amount in numbers (e.g., 600)" 
+                },
+                dollarRate: { 
+                  type: Type.NUMBER, 
+                  description: "Calculated exchange rate (Euro per USD)" 
+                },
+                description: { 
+                  type: Type.STRING, 
+                  description: "Polished Bengali description for the record" 
+                }
+              },
+              required: ["id", "type", "dollarAmount", "dollarRate", "description"]
+            }
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) {
+        throw new Error("Empty response from model");
+      }
+      return JSON.parse(text) as ExtractedDollarTx[];
+    } catch (error) {
+      console.error("Error parsing dollar transactions via Gemini:", error);
+      return [];
     }
   }
 }

@@ -2,7 +2,9 @@
 export enum TransactionType {
   INCOME = 'Income',
   EXPENSE = 'Expense',
-  CARD_PAYMENT = 'Card'
+  CARD_PAYMENT = 'Card',
+  DOLLAR_BUY = 'DollarBuy',
+  DOLLAR_SELL = 'DollarSell'
 }
 
 export interface Transaction {
@@ -14,6 +16,8 @@ export interface Transaction {
   category: string;
   date: string;
   userId: string;
+  dollarAmount?: number;
+  dollarRate?: number;
 }
 
 export interface User {

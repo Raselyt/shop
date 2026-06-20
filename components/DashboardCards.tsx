@@ -8,10 +8,14 @@ interface DashboardCardsProps {
     card: number;
     expense: number;
     profit: number;
+    dollarBuyCost: number;
+    dollarSellRevenue: number;
+    dollarTradingProfit: number;
   };
 }
 
 const DashboardCards: React.FC<DashboardCardsProps> = ({ stats }) => {
+  const shopProfit = stats.income - stats.expense;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Cash Income */}
@@ -48,15 +52,19 @@ const DashboardCards: React.FC<DashboardCardsProps> = ({ stats }) => {
         </div>
       </div>
 
-      {/* Net Profit - Now only reflects Cash Profit */}
+      {/* Net Profit - Now reflects Cash Profit minus Dollar Purchases */}
       <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-6 shadow-xl text-white flex justify-between items-center relative overflow-hidden">
-        <div className="relative z-10">
-          <p className="text-[10px] font-bold text-blue-100 uppercase mb-1 tracking-wider">মোট নগদ নিট লাভ</p>
-          <h3 className="text-2xl font-black mb-1">€{stats.profit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</h3>
-          <p className="text-[8px] text-blue-200 font-bold uppercase tracking-widest flex items-center gap-1">
-            <span className="w-1 h-1 rounded-full bg-blue-300 animate-pulse"></span>
-            নগদ ব্যালেন্স (কার্ড বাদে)
+        <div className="relative z-10 space-y-1">
+          <p className="text-[10px] font-bold text-blue-100 uppercase tracking-wider">মোট নগদ নিট লাভ (ডলার বাদে)</p>
+          <h3 className="text-2xl font-black">€{stats.profit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</h3>
+          <p className="text-[8px] text-blue-200 font-medium">
+            দোকান লাভ: €{shopProfit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
           </p>
+          {stats.dollarBuyCost > 0 && (
+            <p className="text-[8px] text-rose-300 font-bold">
+              ডলার ক্রয় বাবদ মাইনাস: -€{stats.dollarBuyCost.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
+            </p>
+          )}
         </div>
         <div className="bg-white/20 p-3.5 rounded-2xl text-white backdrop-blur-md">
           <TrendingUp size={24} />

@@ -26,6 +26,7 @@ import SyncModal from './components/SyncModal.tsx';
 import AuthScreen from './components/AuthScreen.tsx';
 import AIService from './services/geminiService.ts';
 import CardPaymentsView from './components/CardPaymentsView.tsx';
+import DollarFolderView from './components/DollarFolderView.tsx';
 import { supabase } from './lib/supabase.ts';
 
 const App: React.FC = () => {
@@ -37,7 +38,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showSync, setShowSync] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cards'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cards' | 'dollars'>('dashboard');
   
   const [viewDate, setViewDate] = useState(() => {
     const now = new Date();
@@ -95,6 +96,30 @@ const App: React.FC = () => {
             grossAmount: grossValue 
           };
         }
+        if (t.category && t.category.startsWith('__DOLLAR_BUY:')) {
+          const parts = t.category.replace('__DOLLAR_BUY:', '').replace('__', '').split(':');
+          const rateValue = parseFloat(parts[0] || '0');
+          const usdAmount = parseFloat(parts[1] || '0');
+          return {
+            ...t,
+            type: TransactionType.DOLLAR_BUY,
+            category: 'ডলার ক্রয়',
+            dollarRate: rateValue,
+            dollarAmount: usdAmount
+          };
+        }
+        if (t.category && t.category.startsWith('__DOLLAR_SELL:')) {
+          const parts = t.category.replace('__DOLLAR_SELL:', '').replace('__', '').split(':');
+          const rateValue = parseFloat(parts[0] || '0');
+          const usdAmount = parseFloat(parts[1] || '0');
+          return {
+            ...t,
+            type: TransactionType.DOLLAR_SELL,
+            category: 'ডলার বিক্রয়',
+            dollarRate: rateValue,
+            dollarAmount: usdAmount
+          };
+        }
         return t;
       });
       setTransactions(mappedData);
@@ -110,13 +135,25 @@ const App: React.FC = () => {
     if (!user) return;
 
     const isEditing = !!editingTransaction;
+    let dbType = tx.type;
+    let dbCategory = tx.category;
+
+    if (tx.type === TransactionType.CARD_PAYMENT) {
+      dbType = TransactionType.INCOME;
+      dbCategory = `__CARD_GROSS:${tx.grossAmount || tx.amount}__`;
+    } else if (tx.type === TransactionType.DOLLAR_BUY) {
+      dbType = TransactionType.EXPENSE;
+      dbCategory = `__DOLLAR_BUY:${tx.dollarRate || 0}:${tx.dollarAmount || 0}__`;
+    } else if (tx.type === TransactionType.DOLLAR_SELL) {
+      dbType = TransactionType.INCOME;
+      dbCategory = `__DOLLAR_SELL:${tx.dollarRate || 0}:${tx.dollarAmount || 0}__`;
+    }
+
     const dbPayload: any = {
       description: tx.description,
       amount: tx.amount,
-      type: tx.type === TransactionType.CARD_PAYMENT ? 'Income' : tx.type,
-      category: tx.type === TransactionType.CARD_PAYMENT 
-        ? `__CARD_GROSS:${tx.grossAmount || tx.amount}__` 
-        : tx.category,
+      type: dbType,
+      category: dbCategory,
       date: tx.date,
       userId: user.id
     };
@@ -145,6 +182,18 @@ const App: React.FC = () => {
         processedTx.type = TransactionType.CARD_PAYMENT;
         processedTx.category = 'কার্ড পেমেন্ট';
         processedTx.grossAmount = grossValue;
+      } else if (processedTx.category && processedTx.category.startsWith('__DOLLAR_BUY:')) {
+        const parts = processedTx.category.replace('__DOLLAR_BUY:', '').replace('__', '').split(':');
+        processedTx.type = TransactionType.DOLLAR_BUY;
+        processedTx.category = 'ডলার ক্রয়';
+        processedTx.dollarRate = parseFloat(parts[0] || '0');
+        processedTx.dollarAmount = parseFloat(parts[1] || '0');
+      } else if (processedTx.category && processedTx.category.startsWith('__DOLLAR_SELL:')) {
+        const parts = processedTx.category.replace('__DOLLAR_SELL:', '').replace('__', '').split(':');
+        processedTx.type = TransactionType.DOLLAR_SELL;
+        processedTx.category = 'ডলার বিক্রয়';
+        processedTx.dollarRate = parseFloat(parts[0] || '0');
+        processedTx.dollarAmount = parseFloat(parts[1] || '0');
       }
       
       if (isEditing) {
@@ -189,6 +238,30 @@ const App: React.FC = () => {
     setShowForm(true);
   };
 
+  const migrateDollarTransactions = async (updates: { id: string; type: TransactionType; category: string; description: string }[]) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      for (const update of updates) {
+        let dbType = update.type === TransactionType.DOLLAR_BUY ? TransactionType.EXPENSE : TransactionType.INCOME;
+        await supabase
+          .from('transactions')
+          .update({
+            type: dbType,
+            category: update.category,
+            description: update.description
+          })
+          .eq('id', update.id);
+      }
+      await fetchTransactions();
+    } catch (err) {
+      console.error('Migration failed:', err);
+      alert('মাইগ্রেশন সম্পন্ন করতে সমস্যা হয়েছে।');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const dailyStats = useMemo(() => {
     const dayTx = transactions.filter(t => t.date === selectedDay);
     const cash = dayTx.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
@@ -203,7 +276,39 @@ const App: React.FC = () => {
     const cashIncome = filteredTransactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
     const cardIncome = cardTransactions.reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = filteredTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
-    return { income: cashIncome, card: cardIncome, expense: totalExpense, profit: cashIncome - totalExpense };
+    
+    const dollarBuyCost = filteredTransactions
+      .filter(t => t.type === TransactionType.DOLLAR_BUY)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const dollarSellRevenue = filteredTransactions
+      .filter(t => t.type === TransactionType.DOLLAR_SELL)
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const dollarBoughtUsd = filteredTransactions
+      .filter(t => t.type === TransactionType.DOLLAR_BUY)
+      .reduce((sum, t) => sum + (t.dollarAmount || 0), 0);
+
+    const dollarSoldUsd = filteredTransactions
+      .filter(t => t.type === TransactionType.DOLLAR_SELL)
+      .reduce((sum, t) => sum + (t.dollarAmount || 0), 0);
+
+    const avgBuyRate = dollarBoughtUsd > 0 ? dollarBuyCost / dollarBoughtUsd : 0;
+    const avgSellRate = dollarSoldUsd > 0 ? dollarSellRevenue / dollarSoldUsd : 0;
+    const dollarTradingProfit = dollarSoldUsd > 0 ? (avgSellRate - avgBuyRate) * dollarSoldUsd : 0;
+
+    // Normal net cash profit (income - expense) minus the dollar purchases cost as requested!
+    const profit = cashIncome - totalExpense - dollarBuyCost;
+
+    return { 
+      income: cashIncome, 
+      card: cardIncome, 
+      expense: totalExpense, 
+      profit,
+      dollarBuyCost,
+      dollarSellRevenue,
+      dollarTradingProfit
+    };
   }, [filteredTransactions, cardTransactions]);
 
   const getDisplayMonth = () => {
@@ -287,9 +392,22 @@ const App: React.FC = () => {
         {activeTab === 'dashboard' ? (
           <div className="space-y-6 animate-in fade-in duration-500">
             <DashboardCards stats={stats} />
+            
+            {stats.dollarBuyCost > 0 && (
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 p-5 rounded-3xl flex items-center justify-between shadow-sm">
+                <div>
+                  <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5"><CircleDollarSign size={15} className="text-indigo-600" /> ডলার ব্যবসা সামারি</h4>
+                  <p className="text-[11px] text-indigo-800 font-bold mt-1">
+                    আপনি এই মাসে মোট {filteredTransactions.filter(t => t.type === TransactionType.DOLLAR_BUY).reduce((sum, t) => sum + (t.dollarAmount || 0), 0)} ডলার কিনেছেন।
+                  </p>
+                </div>
+                <button onClick={() => setActiveTab('dollars')} className="text-[9px] font-black bg-indigo-600 text-white uppercase tracking-widest px-4 py-2 rounded-xl shadow-md hover:bg-indigo-700 transition-colors">হিসাব দেখুন</button>
+              </div>
+            )}
+
             <section className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
               <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2"><TrendingUp size={14} className="text-emerald-500" /> আয়-ব্যয় গ্রাফ</h2>
-              <div className="h-64 w-full"><TrendsChart transactions={filteredTransactions} /></div>
+              <div className="h-64 w-full"><TrendsChart transactions={filteredTransactions.filter(t => t.type !== TransactionType.DOLLAR_BUY && t.type !== TransactionType.DOLLAR_SELL)} /></div>
             </section>
             <section className="space-y-4">
               <div className="flex items-center justify-between px-2">
@@ -299,20 +417,37 @@ const App: React.FC = () => {
               <TransactionTable transactions={filteredTransactions} onDelete={deleteTransaction} onEdit={startEdit} />
             </section>
           </div>
-        ) : (
+        ) : activeTab === 'cards' ? (
           <div className="animate-in slide-in-from-right duration-500">
             <CardPaymentsView transactions={cardTransactions} onDelete={deleteTransaction} onEdit={startEdit} />
+          </div>
+        ) : (
+          <div className="animate-in slide-in-from-right duration-500">
+            <DollarFolderView transactions={filteredTransactions} onDelete={deleteTransaction} onEdit={startEdit} onOpenForm={openForm} onMigrate={migrateDollarTransactions} />
           </div>
         )}
       </main>
 
       <div className="fixed bottom-24 right-6 flex flex-col gap-3 z-40 items-end">
-        <button onClick={() => { setEditingTransaction(null); openForm(TransactionType.INCOME); }} className="flex items-center gap-3 bg-emerald-600 text-white px-6 py-4 rounded-[1.75rem] shadow-xl hover:bg-emerald-700 active:scale-95 transition-all border-4 border-white">
-          <span className="text-[11px] font-black uppercase tracking-widest">নগদ যোগ</span><Plus size={22} />
-        </button>
-        <button onClick={() => { setEditingTransaction(null); openForm(TransactionType.CARD_PAYMENT); }} className="flex items-center gap-3 bg-blue-600 text-white px-6 py-4 rounded-[1.75rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all border-4 border-white">
-          <span className="text-[11px] font-black uppercase tracking-widest">কার্ড যোগ</span><CreditCard size={22} />
-        </button>
+        {activeTab === 'dollars' ? (
+          <>
+            <button onClick={() => { setEditingTransaction(null); openForm(TransactionType.DOLLAR_SELL); }} className="flex items-center gap-3 bg-amber-600 text-white px-6 py-4 rounded-[1.75rem] shadow-xl hover:bg-amber-700 active:scale-95 transition-all border-4 border-white">
+              <span className="text-[11px] font-black uppercase tracking-widest">ডলার বিক্রি</span><CircleDollarSign size={22} />
+            </button>
+            <button onClick={() => { setEditingTransaction(null); openForm(TransactionType.DOLLAR_BUY); }} className="flex items-center gap-3 bg-indigo-600 text-white px-6 py-4 rounded-[1.75rem] shadow-xl hover:bg-indigo-700 active:scale-95 transition-all border-4 border-white">
+              <span className="text-[11px] font-black uppercase tracking-widest">ডলার ক্রয়</span><Plus size={22} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => { setEditingTransaction(null); openForm(TransactionType.INCOME); }} className="flex items-center gap-3 bg-emerald-600 text-white px-6 py-4 rounded-[1.75rem] shadow-xl hover:bg-emerald-700 active:scale-95 transition-all border-4 border-white">
+              <span className="text-[11px] font-black uppercase tracking-widest">নগদ যোগ</span><Plus size={22} />
+            </button>
+            <button onClick={() => { setEditingTransaction(null); openForm(TransactionType.CARD_PAYMENT); }} className="flex items-center gap-3 bg-blue-600 text-white px-6 py-4 rounded-[1.75rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all border-4 border-white">
+              <span className="text-[11px] font-black uppercase tracking-widest">কার্ড যোগ</span><CreditCard size={22} />
+            </button>
+          </>
+        )}
       </div>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-8 py-4 flex justify-around items-center z-50">
@@ -321,6 +456,9 @@ const App: React.FC = () => {
         </button>
         <button onClick={() => setActiveTab('cards')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'cards' ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
           <CreditCard size={24} /><span className="text-[9px] font-black uppercase tracking-widest">কার্ড ফোল্ডার</span>
+        </button>
+        <button onClick={() => setActiveTab('dollars')} className={`flex flex-col items-center gap-1.5 transition-all ${activeTab === 'dollars' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}>
+          <CircleDollarSign size={24} /><span className="text-[9px] font-black uppercase tracking-widest">ডলার হিসাব</span>
         </button>
       </nav>
 

@@ -52,22 +52,42 @@ const DashboardCards: React.FC<DashboardCardsProps> = ({ stats }) => {
         </div>
       </div>
 
-      {/* Net Profit - Now reflects Cash Profit minus Dollar Purchases */}
-      <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-6 shadow-xl text-white flex justify-between items-center relative overflow-hidden">
-        <div className="relative z-10 space-y-1">
-          <p className="text-[10px] font-bold text-blue-100 uppercase tracking-wider">মোট নগদ নিট লাভ (ডলার বাদে)</p>
+      {/* Net Profit - Now reflects Total Integrated Cash Balance including Dollar Trade & Profit */}
+      <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 rounded-3xl p-6 shadow-xl text-white flex justify-between items-start relative overflow-hidden">
+        <div className="relative z-10 space-y-2">
+          <div className="space-y-0.5">
+            <span className="bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest inline-block mb-1 animate-pulse">ডলার লাভ ও লেনদেন সহ</span>
+            <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-wider">মোট ক্যাশ ব্যালেন্স ও নিট লাভ</p>
+          </div>
           <h3 className="text-2xl font-black">€{stats.profit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</h3>
-          <p className="text-[8px] text-blue-200 font-medium">
-            দোকান লাভ: €{shopProfit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
-          </p>
-          {stats.dollarBuyCost > 0 && (
-            <p className="text-[8px] text-rose-300 font-bold">
-              ডলার ক্রয় বাবদ মাইনাস: -€{stats.dollarBuyCost.toLocaleString('en-EU', { minimumFractionDigits: 2 })}
+          
+          <div className="space-y-1 pt-1.5 border-t border-indigo-800/60 mt-2 text-[9px] font-medium text-indigo-100">
+            <p className="flex justify-between gap-4">
+              <span className="text-indigo-300">দোকান নিট লাভ:</span>
+              <span className="font-extrabold text-white">€{shopProfit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</span>
             </p>
-          )}
+            {stats.dollarTradingProfit > 0 && (
+              <p className="flex justify-between gap-4">
+                <span className="text-emerald-400">ডলার ব্যবসার লাভ (Net):</span>
+                <span className="font-extrabold text-emerald-400">+€{stats.dollarTradingProfit.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</span>
+              </p>
+            )}
+            {stats.dollarBuyCost > 0 && (
+              <p className="flex justify-between gap-4 text-[8px] text-indigo-300">
+                <span>ডলার ক্রয় বাবদ খরচ:</span>
+                <span className="font-bold text-rose-300">-€{stats.dollarBuyCost.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</span>
+              </p>
+            )}
+            {stats.dollarSellRevenue > 0 && (
+              <p className="flex justify-between gap-4 text-[8px] text-indigo-300">
+                <span>ডলার বিক্রয় ক্যাশ ফেরত:</span>
+                <span className="font-bold text-emerald-300">+€{stats.dollarSellRevenue.toLocaleString('en-EU', { minimumFractionDigits: 2 })}</span>
+              </p>
+            )}
+          </div>
         </div>
-        <div className="bg-white/20 p-3.5 rounded-2xl text-white backdrop-blur-md">
-          <TrendingUp size={24} />
+        <div className="bg-white/10 p-3 rounded-2xl text-indigo-300 backdrop-blur-md self-start shrink-0">
+          <TrendingUp size={20} />
         </div>
       </div>
     </div>

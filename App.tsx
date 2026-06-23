@@ -297,8 +297,8 @@ const App: React.FC = () => {
     const avgSellRate = dollarSoldUsd > 0 ? dollarSellRevenue / dollarSoldUsd : 0;
     const dollarTradingProfit = dollarSoldUsd > 0 ? (avgSellRate - avgBuyRate) * dollarSoldUsd : 0;
 
-    // Normal net cash profit (income - expense) minus the dollar purchases cost as requested!
-    const profit = cashIncome - totalExpense - dollarBuyCost;
+    // Real Cash Balance (Shop Income - Shop Expense - Dollar Purchase Cost + Dollar Sell Revenue)
+    const profit = cashIncome - totalExpense - dollarBuyCost + dollarSellRevenue;
 
     return { 
       income: cashIncome, 

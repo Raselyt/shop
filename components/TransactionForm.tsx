@@ -1,15 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction, TransactionType } from '../types';
+import { Sparkles, TrendingUp, TrendingDown, Calculator, Percent } from 'lucide-react';
 
 interface TransactionFormProps {
   onAdd: (tx: Transaction) => void;
   userId: string;
   initialType?: TransactionType;
   initialData?: Transaction | null;
+  avgBuyRate?: number;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initialType, initialData }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initialType, initialData, avgBuyRate = 0 }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [grossAmount, setGrossAmount] = useState('');
@@ -45,17 +47,62 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
     }
   }, [initialData, initialType]);
 
-  useEffect(() => {
-    if (isDollar) {
-      const usd = parseFloat(dollarAmount);
-      const rate = parseFloat(dollarRate);
-      if (!isNaN(usd) && !isNaN(rate)) {
+  const handleDollarAmountChange = (val: string) => {
+    setDollarAmount(val);
+    const usd = parseFloat(val);
+    const eur = parseFloat(amount);
+    const rate = parseFloat(dollarRate);
+    if (!isNaN(usd) && usd > 0) {
+      if (!isNaN(eur) && eur > 0) {
+        setDollarRate((eur / usd).toFixed(4));
+      } else if (!isNaN(rate) && rate > 0) {
         setAmount((usd * rate).toFixed(2));
-      } else {
-        setAmount('');
       }
     }
-  }, [dollarAmount, dollarRate, type, isDollar]);
+  };
+
+  const handleEuroAmountChange = (val: string) => {
+    setAmount(val);
+    const eur = parseFloat(val);
+    const usd = parseFloat(dollarAmount);
+    const rate = parseFloat(dollarRate);
+    if (!isNaN(eur) && eur > 0) {
+      if (!isNaN(usd) && usd > 0) {
+        setDollarRate((eur / usd).toFixed(4));
+      } else if (!isNaN(rate) && rate > 0) {
+        setDollarAmount((eur / rate).toFixed(2));
+      }
+    }
+  };
+
+  const handleDollarRateChange = (val: string) => {
+    setDollarRate(val);
+    const rate = parseFloat(val);
+    const usd = parseFloat(dollarAmount);
+    if (!isNaN(rate) && rate > 0) {
+      if (!isNaN(usd) && usd > 0) {
+        setAmount((usd * rate).toFixed(2));
+      }
+    }
+  };
+
+  const liveProfitLoss = useMemo(() => {
+    if (type !== TransactionType.DOLLAR_SELL) return null;
+    const usd = parseFloat(dollarAmount);
+    const eur = parseFloat(amount);
+    if (isNaN(usd) || isNaN(eur) || usd <= 0 || !avgBuyRate) return null;
+
+    const buyCost = usd * avgBuyRate;
+    const profit = eur - buyCost;
+    const currentRate = eur / usd;
+
+    return {
+      buyCost,
+      profit,
+      currentRate,
+      avgBuyRate
+    };
+  }, [dollarAmount, amount, type, avgBuyRate]);
 
   // Handle auto-prefilling description on type change
   const handleTypeChange = (newType: TransactionType) => {
@@ -78,7 +125,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!description) return;
-    if (isDollar && (!dollarAmount || !dollarRate)) return;
+    if (isDollar && (!dollarAmount || !amount)) return;
     if (!isDollar && (type === TransactionType.CARD_PAYMENT ? !grossAmount : !amount)) return;
 
     const grossValue = grossAmount ? parseFloat(grossAmount) : (amount ? parseFloat(amount) : 0);
@@ -87,7 +134,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
     if (type === TransactionType.CARD_PAYMENT) {
       netValue = amount ? parseFloat(amount) : grossValue;
     } else if (isDollar) {
-      netValue = parseFloat(dollarAmount) * parseFloat(dollarRate);
+      netValue = parseFloat(amount);
     } else {
       netValue = parseFloat(amount);
     }
@@ -197,43 +244,107 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onAdd, userId, initia
       </div>
 
       {isDollar && (
-        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-5 rounded-3xl border border-slate-100">
-          <div className="space-y-2">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">ডলারের পরিমাণ (USD)</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">$</span>
-              <input 
-                type="number" step="0.01" value={dollarAmount}
-                onChange={(e) => setDollarAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-slate-100 transition-all"
-                required
-              />
+        <div className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">ডলারের পরিমাণ (USD)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">$</span>
+                <input 
+                  type="number" step="any" value={dollarAmount}
+                  onChange={(e) => handleDollarAmountChange(e.target.value)}
+                  placeholder="যেমন: ১০০০"
+                  className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50/50 transition-all focus:border-indigo-400"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">মোট ইউরো (€ তে)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">€</span>
+                <input 
+                  type="number" step="any" value={amount}
+                  onChange={(e) => handleEuroAmountChange(e.target.value)}
+                  placeholder="যেমন: ৯২০"
+                  className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-blue-50/50 transition-all focus:border-indigo-400"
+                  required
+                />
+              </div>
             </div>
           </div>
-          <div className="space-y-2">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider ml-1">বিনিময় হার (Rate/€)</label>
+
+          <div className="space-y-2 pt-2 border-t border-slate-200/50">
+            <div className="flex justify-between items-center px-1">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">বিনিময় হার (Rate / €)</label>
+              <span className="bg-amber-100 text-amber-800 text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">অটো-ক্যালকুলেটেড</span>
+            </div>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">€</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-extrabold text-slate-400">€</span>
               <input 
-                type="number" step="0.01" value={dollarRate}
-                onChange={(e) => setDollarRate(e.target.value)}
-                placeholder="0.00"
-                className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-slate-100 transition-all"
-                required
+                type="number" step="any" value={dollarRate}
+                onChange={(e) => handleDollarRateChange(e.target.value)}
+                placeholder="অটো হিসাব হবে"
+                className="w-full bg-slate-100 border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-bold outline-none text-slate-600 focus:ring-4 focus:ring-slate-200"
               />
             </div>
+            <p className="text-[9px] text-slate-400 font-bold ml-1">
+              টিপস: বড় ভাই, আপনি সরাসরি ডলার এবং মোট ইউরো দিলেই রেট রিয়েল-টাইমে বের হয়ে যাবে।
+            </p>
           </div>
-          <div className="col-span-2 space-y-2 pt-4 mt-2 border-t border-slate-200/60">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">মোট বিক্রয়/ক্রয় মূল্য (€ তে)</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-300">€</span>
-              <input 
-                type="number" disabled value={amount}
-                className="w-full bg-slate-100/80 border border-slate-200 rounded-2xl pl-10 pr-5 py-4 text-sm font-extrabold text-slate-700 opacity-90 cursor-not-allowed"
-              />
+
+          {/* Live Profit/Loss Widget & Suggested Customer Rates */}
+          {liveProfitLoss && (
+            <div className="mt-4 p-4 rounded-2xl bg-indigo-950 text-white space-y-3 relative overflow-hidden">
+              <div className="absolute right-0 bottom-0 opacity-5 pointer-events-none translate-x-4 translate-y-4">
+                <Calculator size={100} />
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-extrabold text-indigo-300 uppercase tracking-widest flex items-center gap-1">
+                  <Percent size={11} /> ব্যবসা লাভ/ক্ষতি এনালাইসার
+                </span>
+                <span className="text-[9px] font-bold text-slate-300">ক্রয় গড় দর: €{avgBuyRate.toFixed(4)}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <p className="text-[9px] text-indigo-200 font-semibold">আপনার ক্রয় খরচ:</p>
+                  <p className="text-sm font-black text-slate-200">€{liveProfitLoss.buyCost.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] text-indigo-200 font-semibold">কার্যকরী বিক্রয় দর:</p>
+                  <p className="text-sm font-black text-amber-300">€{liveProfitLoss.currentRate.toFixed(4)}</p>
+                </div>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-3 flex justify-between items-center">
+                <div>
+                  <p className="text-[9px] text-white/70 font-semibold">নিট ফলাফল:</p>
+                  <p className={`text-base font-black ${liveProfitLoss.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {liveProfitLoss.profit > 0 ? '+' : ''}€{liveProfitLoss.profit.toFixed(2)} {liveProfitLoss.profit >= 0 ? 'লাভ 🎉' : 'লোকসান ⚠️'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  {liveProfitLoss.profit >= 0 ? (
+                    <span className="bg-emerald-500/20 text-emerald-400 p-1.5 rounded-lg inline-block">
+                      <TrendingUp size={18} />
+                    </span>
+                  ) : (
+                    <span className="bg-rose-500/20 text-rose-400 p-1.5 rounded-lg inline-block">
+                      <TrendingDown size={18} />
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Suggested pricing block */}
+              <div className="text-[9.5px] leading-relaxed text-indigo-100 font-medium">
+                💡 <span className="font-bold text-amber-300">পরবর্তী দর সাজেস্ট:</span> পরবর্তী কাস্টমার বা ট্যুরিস্টদের থেকে ডলার কিনতে চাইলে <span className="font-bold text-emerald-400">€{(liveProfitLoss.currentRate - 0.015).toFixed(4)}</span> এর নিচে কেনার ট্রাই করবেন। আর খুচরা গ্রাহকদের কাছে বিক্রয় করার চমৎকার দর হচ্ছে <span className="font-bold text-amber-300">€{(liveProfitLoss.currentRate + 0.015).toFixed(4)}</span>। এতে আপনার ভালো প্রফিট থাকবে!
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

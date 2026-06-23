@@ -471,7 +471,13 @@ const App: React.FC = () => {
               <h2 className="text-xl font-black text-slate-900 uppercase">{editingTransaction ? 'হিসাব পরিবর্তন করুন' : 'হিসাব যোগ করুন'}</h2>
               <button onClick={() => { setShowForm(false); setEditingTransaction(null); }} className="text-slate-400 p-2 hover:bg-slate-50 rounded-xl transition-all"><Plus size={24} className="rotate-45" /></button>
             </div>
-            <TransactionForm onAdd={addTransaction} userId={user.id} initialType={formType} initialData={editingTransaction} />
+            <TransactionForm 
+              onAdd={addTransaction} 
+              userId={user.id} 
+              initialType={formType} 
+              initialData={editingTransaction} 
+              avgBuyRate={stats.avgBuyRate || 0}
+            />
           </div>
         </div>
       )}
